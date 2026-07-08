@@ -70,7 +70,7 @@ Camada humana **elevada** a primeira classe (⭐ = novo/elevado vs. a referênci
 
 | Camada | Documentos |
 |---|---|
-| **0 · Domínio** | Visão geral · Glossário · ⭐Catálogo de regras (com *porquê*) · ⭐Registro de restrições |
+| **0 · Domínio** | Visão geral · Glossário · ⭐Catálogo de regras (com *porquê*) · ⭐Registro de restrições · ⭐Fluxos de negócio (um por fluxo, pra PO — companheiro da Camada 3) |
 | **1 · Topologia & Sistemas** | ⭐Mapa de serviços · ⭐Contratos de fronteira · ⭐Deps externas como risco · ⭐Modos de falha & blast radius |
 | **2 · Estrutura** | Organização do código · Dados & persistência · Configurações |
 | **3 · Fluxos** ⭐joia | Um por fluxo crítico, ponta-a-ponta, sequence + trace `arquivo:linha` + contratos de fronteira que cruza |
@@ -129,21 +129,29 @@ Sequência (um run por projeto):
 13. **Completude: estrutural bloqueante + rubrica consultiva.**
 14. **Mermaid: prevenir + detectar (agora) + build-gate (futuro); fidelidade amarrada ao grafo rastreado.**
 15. **Sequência + depth-first após fundação fina** (§6).
+16. **Track de negócio: 2ª passada, após o técnico completo** — um doc "Fluxo de Negócio" por fluxo, pra uma PO nova, em linguagem simples; roda depois do técnico porque a inferência do porquê se apoia na base já verificada.
+17. **3ª categoria de verdade: `[inferido do código · a confirmar]`** — além de *fato citado* e *atribuído ao humano*, o porquê de negócio pode ser inferido da base técnica, sempre com base explícita e marcado como não-confirmado. Nunca ficção.
+18. **Doc de negócio: arquivo separado, zero código na prosa** — âncora via link pro doc técnico + tabela de trace recolhível; o QUÊ é herdado-verificado, o PORQUÊ é atribuído ou inferido-marcado.
+19. **Gate de negócio (`grill-negocio`): âncora + zero-jargão + exemplo-fiel bloqueantes; legibilidade consultiva** — espelha o `grill-doc`.
+20. **Camada 0 elevada — Visão de Produto (`documentar-visao` + `grill-visao`):** um overview de app pra uma **PO nova** entender o produto **inteiro** (não um fluxo só). Roda **por último** no track de negócio (liga os docs de negócio já escritos, **não os inventa**) e re-roda quando novos fluxos ganham doc. Publicável em `docs/00-dominio/visao-de-produto.md`.
+21. **Âncora de síntese + honestidade de cobertura:** a visão ancora cada fluxo no **doc de negócio** (herda o "Em uma frase" **citado**, não reescrito; cadeia Visão→negócio→técnico), marca o "o que o app é no todo" como `[inferido do código · a confirmar]` (nenhum fluxo isolado prova o todo), e **declara cobertura** (N de ~M, com o que falta **listado** — mata o *silent-cap*, espelha a completude-estrutural). O gate `grill-visao` espelha o `grill-negocio` trocando "exemplo fiel" por **"mapa fiel"** (link resolve + one-liner idêntico ao "Em uma frase" + cobertura honesta).
 
 ---
 
 ## 9. Itens mecânicos em aberto (defaults recomendados — não ratificados)
 
 - **Docusaurus** — categorias da sidebar = as 6 camadas (§5); frontmatter com `sidebar_position`; mermaid via `@docusaurus/theme-mermaid`; mapa em `.arquitetura/mapa/` (fora de `docs/`); registro de divergências como doc própria em `Referência`.
-- **Empacotamento por assistente** (triplo-write a partir de uma fonte canônica única = `prompts/*.md`; gerador `tools/empacotar.py` → `dist/`). Os 5 são **invocáveis (inclusão manual)**, não always-on — rodam em sequência, um por vez. Convenções **confirmadas nos docs/fonte oficiais (2026-07)**:
+- **Empacotamento por assistente** (triplo-write a partir de uma fonte canônica única = `prompts/*.md`; gerador `tools/empacotar.py` → `dist/`). Todos são **invocáveis (inclusão manual)**, não always-on — rodam em sequência, um por vez. Convenções **confirmadas nos docs/fonte oficiais (2026-07)**:
   - `.amazonq/prompts/<nome>.md` — Markdown puro, **sem frontmatter**; invoca `@<nome>` no `q chat` (pasta do projeto é **CLI-only**; o IDE lê só `~/.aws/amazonq/prompts/`).
   - `.github/prompts/<nome>.prompt.md` — frontmatter `agent: 'agent'` + `description` (`mode` foi **depreciado** → `agent`); invoca `/<nome>` no Copilot Chat.
   - `.kiro/steering/<nome>.md` — frontmatter `inclusion: manual`; referencia `#<nome>`.
   - _As always-on (`.amazonq/rules/*`, `.github/instructions/* applyTo:"**"`, `inclusion: always`) NÃO servem para invocável e ficam para uma futura regra always-on separada, se um run real exigir — hoje o princípio-norte vai embutido em cada prompt._
 - **Schema do mapa** — `_indice.md` (árvore L0-L1 + tabela de cobertura) + um arquivo por módulo top-level (L2-L4); campo de status por nó: `esqueleto → inferido → verificado | corrigido`, mais `stale`; carimbo de frescor (commit/hash do arquivo).
-- **Inventário de skills/prompts a construir:**
-  - `bootstrap-contexto` · `mapear-estrutura` (map builder) · `grill-with-docs` (reusar) · `grill-doc` (gate de completude) · `grill-mermaid` (lint de diagrama)
-  - geradores por tipo de doc: `glossario` · `restricoes` · `regras` · `estrutura` · `topologia` · `fluxo` · `runbook` · `adr` · `rastreabilidade`
+- **Inventário de prompts:**
+  - **Track técnico (construído):** `bootstrap-contexto` · `mapear-estrutura` · `documentar-fluxo` · `grill-doc` · `grill-mermaid`
+  - **Track de negócio (construído):** `contexto-produto` (lente de PO) · `documentar-negocio` (a joia de negócio) · `grill-negocio` (gate) → doc em `docs/00-dominio/fluxos-negocio/<slug>.md`
+  - **Camada 0 · Visão de Produto (construído):** `documentar-visao` (overview de app; cita o "Em uma frase" de cada fluxo + mapa de cobertura honesto) · `grill-visao` (gate: âncora + zero-jargão + **mapa-fiel**) → doc em `docs/00-dominio/visao-de-produto.md`
+  - **Geradores por tipo de doc (a construir):** `glossario` · `restricoes` · `regras` · `estrutura` · `topologia` · `runbook` · `adr` · `rastreabilidade`
 
 ---
 

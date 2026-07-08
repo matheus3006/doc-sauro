@@ -4,12 +4,17 @@
 > a partir da fonte canônica `prompts/*.md`. Editar um alvo é drift garantido.
 > Para mudar um prompt, edite o canônico e rode `python3 tools/empacotar.py`.
 
-Prompts empacotados (5) — a ordem da cadeia está na seção de smoke-test abaixo e em `../prompts/README.md`:
+Prompts empacotados (10) — a ordem da cadeia está na seção de smoke-test abaixo e em `../prompts/README.md`:
 
 - `bootstrap-contexto`
+- `contexto-produto`
 - `documentar-fluxo`
+- `documentar-negocio`
+- `documentar-visao`
 - `grill-doc`
 - `grill-mermaid`
+- `grill-negocio`
+- `grill-visao`
 - `mapear-estrutura`
 
 ## Como implantar no projeto-alvo

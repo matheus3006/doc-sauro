@@ -45,6 +45,22 @@ Cada passo termina imprimindo o **próximo comando** (handoff); o mapa em `.arqu
 > **Sessão = unidade de isolamento.** Rode cada passo numa conversa limpa; o estado vive
 > nos arquivos (`.arquitetura/`, `docs/`), não no histórico do chat.
 
+### Track de negócio — opcional, depois do técnico
+
+Com o track técnico de um fluxo **completo**, você pode gerar a **versão de negócio** dele — pra uma **PO nova** entender o que o app faz, em linguagem simples, sem ver código. Você **inicia à mão** (não é encadeado pelo handoff do técnico):
+
+| Passo | Prompt | Produz |
+|---|---|---|
+| 5 | `contexto-produto` (1×) | `.arquitetura/contexto-produto.md` (personas, jobs, glossário) |
+| 6 | `documentar-negocio` ⭐ | `docs/00-dominio/fluxos-negocio/<slug>.md` |
+| 7 | `grill-negocio` | veredito: âncora + zero-jargão + exemplo-fiel (bloqueantes) |
+| 8 | `documentar-visao` | `docs/00-dominio/visao-de-produto.md` (overview do app + mapa de fluxos) |
+| 9 | `grill-visao` | veredito: âncora + zero-jargão + mapa-fiel (bloqueantes) |
+
+Roda **depois** do técnico de propósito: quando o "porquê" de negócio não tem dono humano à mão, o `documentar-negocio` **infere da base técnica já verificada** e marca `[inferido do código · a confirmar]` — nunca inventa. Exemplo real (doc técnico + doc de negócio do mesmo fluxo) no [piloto](piloto/docs/00-dominio/fluxos-negocio/wakeup-run-settle.md).
+
+Os passos **8-9** são a **Visão de Produto** — a porta de entrada de Camada 0 pra uma PO nova entender o app **inteiro** (não um fluxo só). Rode **por último**, depois de ter **pelo menos um** doc de negócio: a visão **liga** os fluxos já escritos (cita o "Em uma frase" de cada um) e é **honesta sobre a cobertura** (lista o que ainda não tem doc, sem fingir que a fatia é o app todo). Re-rode quando novos fluxos ganharem doc. Exemplo real no [piloto](piloto/docs/00-dominio/visao-de-produto.md).
+
 ## O prompt inicial (copiar e colar)
 
 O fluxo começa no **Passo 0**. Com os prompts instalados, o "prompt inicial" é só invocar

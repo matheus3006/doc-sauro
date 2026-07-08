@@ -19,6 +19,18 @@ real e um fluxo crítico real, produzindo **1 doc de fluxo** que passa os gates.
 
 **Resultado + verificação:** [`EVIDENCIA.md`](EVIDENCIA.md) — 9 gaps que a passada rasa deixaria de fora, os vereditos dos gates, e o `/verify` (194 citações resolvem no commit pinado, mermaid renderiza em SVG de 67KB, frontmatter/MDX limpos, drift do working tree pego e resolvido).
 
+## Track de negócio + Visão de Produto (Camada 0)
+
+Sobre o mesmo fluxo e o mesmo commit `d20f55f`, rodei também o track de negócio e a Visão de Produto — a prova de que o QUÊ verificado vira linguagem de PO **sem desancorar**:
+
+| Prompt | Saída | Gate |
+|---|---|---|
+| `contexto-produto` | [`.arquitetura/contexto-produto.md`](.arquitetura/contexto-produto.md) | — |
+| `documentar-negocio` | [`docs/00-dominio/fluxos-negocio/wakeup-run-settle.md`](docs/00-dominio/fluxos-negocio/wakeup-run-settle.md) | [`grill-negocio`](gates/grill-negocio.wakeup-run-settle.md) — **APROVADO** |
+| `documentar-visao` | [`docs/00-dominio/visao-de-produto.md`](docs/00-dominio/visao-de-produto.md) | [`grill-visao`](gates/grill-visao.visao-de-produto.md) — **APROVADO** |
+
+A **Visão de Produto** cobre **1** de ~12 áreas de produto que o mapa conhece, com as 9 restantes **listadas** como fila de trabalho (honestidade de cobertura — sem *silent-cap*). Verificação mecânica do gate: o link resolve, o one-liner de cada fluxo é **byte-a-byte** o "Em uma frase" do doc de negócio, a cobertura confere com o `_indice.md` (3 `parcial` + 9 `esqueleto` de produto + 2 transversais), e a prosa tem **zero** nome de classe / `arquivo:linha` / enum cru.
+
 ## Reproduzir a verificação
 
 ```bash

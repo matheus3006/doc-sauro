@@ -51,6 +51,16 @@ Superfície observada de verdade, não "os testes passam":
 
 **Veredito /verify: PASS** — o slice roda ponta-a-ponta, produz 1 doc de fluxo que passa os gates, e as afirmações são reproduzíveis contra um commit imutável.
 
+## Camada 0 — Visão de Produto: cobertura honesta (a fatia nova)
+
+Depois do técnico e do negócio, a **Visão de Produto** (`documentar-visao` → `grill-visao`) fecha a Camada 0: o overview que uma PO nova lê pra entender o app **inteiro**. O que ela prova que a passada rasa erraria:
+
+- **Não finge que 1 fluxo é o app.** O mapa da visão lista **1** fluxo documentado **e** as **9** áreas de produto que o `_indice.md` conhece e ainda **não têm doc** — fila de trabalho explícita, não silêncio. É a completude-estrutural (§7) aplicada ao overview: *coberto OU marcado*, sem *silent-cap*.
+- **Liga sem reescrever.** O one-liner de cada fluxo é **byte-a-byte** o "Em uma frase" do doc de negócio já aprovado (diff automático: idêntico) — reescrever desancoraria do que o `grill-negocio` chancelou. Cadeia: Visão → negócio → técnico (`arquivo:linha`).
+- **Síntese marcada, nunca fato.** "O que o app é no todo" entra `[inferido do código · a confirmar]` (nenhum fluxo isolado prova o todo); personas/jobs herdam a marcação do `contexto-produto`.
+
+**Gate `grill-visao`: APROVADO** (3 bloqueantes PASSAM — âncora, zero-jargão, mapa-fiel). O gate pegou um **duplo-uso do módulo `governance`** (contado como área "coberta" via orçamento **e** listado como "sem doc" via aprovação prévia) e forçou o ajuste antes do veredito — mesmo padrão de B14/B21 no técnico e dos rótulos de seção no negócio: **o gate funcionando**. Verificação mecânica: link resolve, one-liner idêntico, `N=1` doc de negócio, cobertura confere com o `_indice.md`.
+
 ## Refinamentos que o piloto forçou nos prompts (DESIGN §10: "ajuste só se o piloto exigir")
 
 1. **`mapear-estrutura`** — stubs por-módulo viraram **lazy (no primeiro toque)**, não eager-14-arquivos: eager contradiz "mapa barato + não mapeie o repo inteiro".
