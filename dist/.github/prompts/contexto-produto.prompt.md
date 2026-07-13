@@ -1,77 +1,139 @@
 ---
-description: 'Você produz a lente de PO: quem usa o produto, que jobs ele resolve e o vocabulário de produto que dá linguagem aos docs de negócio.'
+description: 'Você produz .arquitetura/contexto-produto.md: um modelo de domínio voltado a produto, com personas, jobs, termos, regras e lacunas.'
 agent: 'agent'
 ---
 
 # Prompt · `contexto-produto`
 
-> Abre o **track de negócio** da trilha. Portável: roda em Amazon Q, GitHub Copilot ou Kiro — **standalone**, sem subagente, sem parser/ctags/tree-sitter. Leitura **LLM-native**. Roda **uma vez por projeto**, **depois** de todo o track técnico (contexto → mapa → fluxos → gates) estar completo.
+> Abre o track de negócio. Portável (Amazon Q / Copilot / Kiro), **standalone**,
+> sem subagente e sem parser. Roda uma vez por projeto depois de pelo menos um fluxo
+> técnico passar nos dois gates.
 
-Você produz a **lente de PO**: quem usa o produto, que **jobs** ele resolve e o **vocabulário de produto** que dá linguagem aos docs de negócio. Produz `.arquitetura/contexto-produto.md` — o pano de fundo que todo doc de negócio lê. Roda **depois do técnico** de propósito: quando o negócio não tem dono humano à mão pra explicar, você **infere da base técnica já verificada** — e só dá pra inferir do que já foi rastreado.
+Você produz `.arquitetura/contexto-produto.md`: um modelo de domínio voltado a produto,
+com personas, jobs, termos, regras e lacunas. Ele dá linguagem consistente aos docs de
+negócio sem transformar inferência técnica em verdade de produto.
 
-## Princípio-norte (inegociável)
+## Contrato de execução
 
-> Este é o track de **elicitação**, não de extração. Você **não afirma comportamento de código como fato** aqui — isso é do doc técnico (`arquivo:linha`). O que você captura é **produto**: persona, job, termo de domínio. Cada afirmação entra **atribuída** (humano: verbatim + quem + quando) **ou** `[inferido do código · a confirmar]` (ancorada numa observação do doc técnico) — **nunca inventada**.
+- Insumos: `.arquitetura/contexto.md`, mapa, docs técnicos e, para cada fluxo usado,
+  `grill-doc.<slug>.md` + `grill-mermaid.<slug>.md` aprovados no mesmo snapshot.
+- Fluxo sem os dois gates pode aparecer apenas em **lacunas**, nunca como base aprovada.
+- Pode escrever somente `.arquitetura/contexto-produto.md`.
+- Não reabre nem reinterpretará código para criar propósito. O QUÊ vem do doc técnico;
+  o PORQUÊ vem do humano ou permanece inferência marcada.
+- Se nenhum fluxo técnico estiver aprovado, pare `BLOQUEADO`.
 
-A regra de ouro do inferido: uma inferência **sempre aponta a base** (que observação do doc técnico a sustenta). Inferência sem base é chute — e chute não entra.
+## Jurisdição e estados de conhecimento
 
-## Insumos
+Cada afirmação usa exatamente um estado:
 
-- `.arquitetura/contexto.md` (tier, propósito no vocabulário do domínio, blast radius, restrições, padrões-que-não-se-aplicam — já elicitados).
-- `docs/03-fluxos/*.md` — os docs técnicos de fluxo **já produzidos e aprovados** (a base verificada de onde inferir).
-- `.arquitetura/mapa/` — para o vocabulário de módulos/entrypoints.
+- `atribuído` — verbatim + quem + quando;
+- `herdado-verificado` — comportamento vindo de doc técnico aprovado, apontado por
+  `FLUXO/PASSO/ARESTA/FRONTEIRA`;
+- `[inferido do código · a confirmar]` — hipótese de produto com base explícita no doc
+  técnico/contexto; nunca no mapa isolado;
+- `[PENDENTE]` — não há base suficiente ou falta decisão humana.
 
-## Passos
+Mapa e entrypoint ajudam a localizar; não provam persona, job ou regra de negócio.
+Preserve `ARC-###` e `CON-###`. Conflito vira divergência, não uma redefinição silenciosa.
 
-### 1 · Reúna a base
+## Fase 1 · Delimite o domínio observado
 
-Leia o `contexto.md` inteiro e cada doc técnico de fluxo existente. O `contexto.md` já traz muito produto elicitado (propósito, blast radius, restrições) — **reuse, não re-elicite**. Os docs de fluxo mostram os **atores** (quem dispara), os estados e os termos de domínio.
+Leia o contexto inteiro e apenas os fluxos tecnicamente aprovados. Registre:
 
-### 2 · Personas / atores
+- **bounded context observado:** que parte do negócio esses fluxos cobrem;
+- **fora da amostra:** entrypoints/áreas ainda sem fluxo aprovado;
+- **linguagem existente:** termos humanos do contexto e termos técnicos a traduzir;
+- **invariantes/regras candidatas:** só quando atribuídas ou inferidas com base.
 
-Quem usa o produto — e o que cada um quer. Fonte: o humano; na ausência, os **atores** dos diagramas e o propósito do contexto (inferido). Para cada persona:
+Não chame a amostra de “produto inteiro”.
 
-- **Nome** no vocabulário do domínio (não "usuário genérico").
-- **O que faz** com o produto (o job de alto nível).
-- Marque **atribuído** (verbatim + quem + quando) **ou** `[inferido do código · a confirmar]` com a base.
+## Fase 2 · Modele com IDs estáveis
 
-### 3 · Jobs (JTBD)
+### Personas `PER-###`
 
-Os "trabalhos" que o produto resolve, na voz de quem tem o problema (*"quando eu ___, quero ___, pra ___"*). Derive do propósito elicitado + dos fluxos. Cada job atribuído ou inferido-marcado.
+Nome no vocabulário do domínio, job de alto nível e relação com os fluxos. “Usuário”
+genérico só vale se o contexto realmente não distinguir papéis.
 
-### 4 · Glossário de produto
+### Jobs `JOB-###`
 
-Os **termos user-facing** do domínio, cada um com uma **definição simples** (uma frase, sem jargão). Este glossário é a **fonte de vocabulário** do `documentar-negocio` e o que o `grill-negocio` usa pra barrar jargão. Inclua o **par técnico → produto** quando ajudar (ex.: *"Issue = uma tarefa de trabalho"*; *"Run = uma tentativa de execução"*).
+Formato: “Quando <situação>, <persona> quer <resultado>, para <valor>”. Resultado e
+valor são coisas diferentes; o fluxo pode provar o primeiro e não o segundo.
 
-### 5 · Grave `.arquitetura/contexto-produto.md`
+### Termos `TERMO-###`
 
-Interno, **fora de `docs/`**. Use exatamente esta forma:
+Definição simples, sinônimos proibidos/ambíguos e par técnico→produto quando útil. Se a
+mesma palavra tiver dois sentidos, crie duas entradas e delimite contexto.
+
+### Regras/invariantes `REGRA-###`
+
+Regra, motivo, consequência de violação e fonte. Não promova um guard técnico a política
+de negócio sem confirmação; mantenha como inferência.
+
+### Lacunas `LACUNA-###`
+
+Pergunta concreta, por que importa, base disponível, dono da resposta e artefatos que
+precisarão ser revistos quando resolvida. Toda lacuna cita os `FLUXO/PASSO/PER/JOB/TERMO`
+que a revelaram; “confirmar persona” ou “qual é o valor?” sem gatilho específico é inválido.
+
+## Checkpoint humano
+
+Se um dono de produto estiver disponível, apresente personas, jobs, termos ambíguos e
+regras inferidas por meio das `LACUNA-###` concretas e peça confirmação. Não faça
+pergunta genérica fora dessas lacunas. Se não estiver disponível, grave inferências e
+lacunas; não simule aprovação.
+
+## Saída
 
 ```md
-# Contexto de Produto — <nome do projeto>
-> Interno. Lente de PO da trilha. Elicitação: atribuída OU [inferido do código · a confirmar].
-> Frescor: <data-hora> · <commit/hash se houver>
+# Contexto de Produto — <projeto>
+> Interno. Modelo observado, não descrição total do produto.
+> Frescor: <data-hora> · snapshots técnicos aprovados: <lista fluxo→snapshot>
+
+## Limite do domínio observado
+- Bounded context: <descrição + base>
+- Fora da amostra: <ENTRY-IDs/áreas>
 
 ## Personas
-- **<Persona>** — <o que faz> — <atribuído: quem, quando> | [inferido do código · a confirmar] — base: <observação do doc técnico>
+| ID | Persona | Job de alto nível | Fluxos/base | Estado |
+|---|---|---|---|---|
+| `PER-001` | <nome> | <job> | <fonte> | atribuído / inferido-a-confirmar |
 
 ## Jobs (JTBD)
-- Quando <situação>, <persona> quer <resultado>, pra <valor>. — <atribuído | inferido + base>
+| ID | Job | Persona | Base | Estado |
+|---|---|---|---|---|
+| `JOB-001` | Quando..., quer..., para... | `PER-###` | <fonte> | <estado> |
 
 ## Glossário de produto
-- **<termo>** — <definição simples de 1 frase> (técnico: `<par>`) — <atribuído | inferido + base>
+| ID | Termo | Definição simples | Evitar/ambiguidade | Par técnico | Base/estado |
+|---|---|---|---|---|---|
+| `TERMO-001` | <termo> | <definição> | <sinônimo a evitar> | `<par>` | <fonte/estado> |
+
+## Regras e invariantes
+| ID | Regra | Porquê/consequência | Base | Estado |
+|---|---|---|---|---|
+| `REGRA-001` | <regra> | <valor/risco> | <fonte> | atribuído / inferido-a-confirmar |
+
+## Restrições e compromissos relevantes
+- `CON-###` / `ARC-###` — <como limita a linguagem/decisão de produto>
+
+## Lacunas e decisões humanas
+| ID | Pergunta | Por que importa | Dono | Impacta |
+|---|---|---|---|---|
+| `LACUNA-001` | <pergunta> | <risco> | <quem/desconhecido> | <artefatos> |
 ```
 
-## Critério de conclusão (checável)
+## Critério de conclusão
 
-- `.arquitetura/contexto-produto.md` existe, fora de `docs/`.
-- **Toda** persona, job e termo é **atribuído** OU **`[inferido do código · a confirmar]` com base explícita**. Zero afirmação sem uma das duas.
-- O glossário cobre os termos de domínio que aparecem nos docs técnicos de fluxo.
-- **Zero** `arquivo:linha` na prosa deste doc (isto é produto, não código) — a base do inferido aponta a **observação/seção do doc técnico**, não uma linha de código.
-- **Nenhum** termo técnico (nome de classe/arquivo) tratado como termo de produto.
+- Todo fluxo usado tem os dois gates técnicos aprovados no mesmo snapshot.
+- Toda persona/job/termo/regra tem ID, base e estado explícito.
+- O limite observado e o fora-da-amostra estão declarados.
+- Termos ambíguos e invariantes têm tratamento explícito.
+- Toda `LACUNA-###` aponta os sinais específicos que a geraram; zero pergunta genérica.
+- Decisões humanas não foram ratificadas pela IA.
+- Zero nome de arquivo/`arquivo:linha` na prosa de produto; bases referem IDs/seções dos
+  artefatos aprovados.
 
 ## Handoff
 
-Imprima ao humano, literalmente:
-
-> Contexto de produto gravado em `.arquitetura/contexto-produto.md`. Próximo passo: rode **`documentar-negocio`** informando **um** fluxo que o track técnico já documentou (ex.: `wakeup-run-settle`).
+> Contexto de produto gravado em `.arquitetura/contexto-produto.md` com <n> lacunas humanas. Próximo passo: rode **`documentar-negocio`** para um `FLUXO-<slug>` tecnicamente aprovado.

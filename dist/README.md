@@ -4,7 +4,7 @@
 > a partir da fonte canônica `prompts/*.md`. Editar um alvo é drift garantido.
 > Para mudar um prompt, edite o canônico e rode `python3 tools/empacotar.py`.
 
-Prompts empacotados (10) — a ordem da cadeia está na seção de smoke-test abaixo e em `../prompts/README.md`:
+Prompts empacotados (11) — a ordem da cadeia está na seção de smoke-test abaixo e em `../prompts/README.md`:
 
 - `bootstrap-contexto`
 - `contexto-produto`
@@ -16,6 +16,7 @@ Prompts empacotados (10) — a ordem da cadeia está na seção de smoke-test ab
 - `grill-negocio`
 - `grill-visao`
 - `mapear-estrutura`
+- `revisar-arquitetura`
 
 ## Como implantar no projeto-alvo
 
@@ -30,12 +31,15 @@ Copie a pasta da ferramenta que você usa para a **raiz do repositório-alvo**:
 ## Como invocar cada prompt (+ smoke-test manual)
 
 A cadeia roda **em sequência, um prompt por vez** — cada prompt termina imprimindo o
-próximo comando (handoff) e o mapa em `.arquitetura/` é o ledger entre as sessões:
+próximo comando (handoff); `.arquitetura/grills/` mantém as perguntas específicas, o
+mapa mantém o ledger e `.arquitetura/gates/` mantém aprovações entre sessões:
 
     bootstrap-contexto → mapear-estrutura → documentar-fluxo → grill-doc → grill-mermaid
+    [opcional] revisar-arquitetura
+    contexto-produto → documentar-negocio → grill-negocio → documentar-visao → grill-visao
 
-Por isso os 5 são **invocáveis (inclusão manual)**, não always-on: always-on injetaria
-os 5 em toda interação — bloat de contexto e quebra da sequência.
+Por isso os prompts da cadeia são **invocáveis (inclusão manual)**, não always-on: always-on
+injetaria todos em toda interação — bloat de contexto e quebra da sequência.
 
 > Rodar os prompts de ponta a ponta dentro de cada ferramenta é **passo humano**. Este
 > checklist só confirma que cada prompt está **invocável** no runtime certo.
@@ -46,7 +50,7 @@ Markdown puro, sem frontmatter: o arquivo inteiro é o prompt. Nome invocado = a
 - **CLI `q chat`** (lê a pasta do projeto): na raiz do repo, rode `q chat` e invoque `@bootstrap-contexto`.
 - **IDE plugin (VS Code/JetBrains)**: lê **só a pasta global** — copie os `.md` para `~/.aws/amazonq/prompts/` (ou cole o conteúdo à mão). Requer um `q`/plugin atual.
 
-- [ ] `/prompts list` (CLI) ou o menu `@` (IDE) mostra os 5 nomes.
+- [ ] `/prompts list` (CLI) ou o menu `@` (IDE) mostra os nomes da cadeia.
 - [ ] `@bootstrap-contexto` injeta o prompt e ele começa a rodar.
 
 ### GitHub Copilot — `.github/prompts/`
@@ -54,7 +58,7 @@ Arquivo `<nome>.prompt.md`; frontmatter `agent: 'agent'` (modo agente, para os p
 
 - Em **VS Code / Visual Studio / JetBrains**, abra o Copilot Chat e digite `/bootstrap-contexto` (nome = arquivo sem `.prompt.md`). Recurso em public preview.
 
-- [ ] Digitar `/` no chat lista os 5 prompts.
+- [ ] Digitar `/` no chat lista os prompts da cadeia.
 - [ ] `/bootstrap-contexto` roda e produz `.arquitetura/contexto.md`.
 
 ### Kiro — `.kiro/steering/`

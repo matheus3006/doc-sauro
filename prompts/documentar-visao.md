@@ -1,123 +1,186 @@
 # Prompt · `documentar-visao`
 
-> A porta de entrada do **track de negócio**. Portável (Amazon Q / Copilot / Kiro), **standalone**, sem subagente, sem parser. Roda **uma vez por projeto** (e re-roda quando novos fluxos ganham doc de negócio), **depois** do `contexto-produto` e de **pelo menos um** `documentar-negocio` — porque a visão **liga os docs de negócio já escritos**, não os inventa.
+> Síntese progressiva do track de negócio. Portável (Amazon Q / Copilot / Kiro),
+> **standalone**, sem subagente e sem parser. Roda depois de pelo menos um
+> `grill-negocio` aprovado e re-roda à medida que a cobertura cresce.
 
-Você escreve a **Visão de Produto**: o overview de Camada 0 que faz uma **PO nova** entender **o app inteiro** — o que o produto é, pra quem, e o **mapa dos fluxos principais** — sem ver uma linha de código. Não é um fluxo a mais: é a **porta de entrada** que aponta pra cada doc de negócio por-fluxo. O QUÊ de cada fluxo você **herda** (cita o "Em uma frase" do doc de negócio, que já passou pelo gate); o que o produto **é no todo** você **infere-e-marca**; e você é **honesto sobre a cobertura** — nunca deixa parecer que a fatia documentada é o app inteiro.
+Você escreve a porta de entrada do domínio sem fingir completude. A visão liga somente
+fluxos de negócio aprovados, sintetiza o domínio observado com marcação de incerteza e
+mostra cobertura em duas medidas que não se confundem: quantidade de docs e entrypoints
+cobertos.
 
-> **Este prompt encoda três comportamentos** que no Claude seriam skills e que **aqui não existem** — então estão escritos abaixo, não invocados:
-> 1. **Síntese de produto:** olha o conjunto dos fluxos e do propósito elicitado e diz **o que o app é como um todo** — nunca só empilha fluxos.
-> 2. **Linguística:** escreve simples (POV da PO, voz ativa, zero jargão), só o vocabulário do glossário.
-> 3. **Honestidade de cobertura:** sempre declara quantos fluxos a visão cobre de quantos o mapa conhece; a lista do que falta é a fila de trabalho da PO — nunca um silêncio que engana.
+## Contrato de execução
 
-## Princípio-norte (inegociável)
+- Insumos: contexto, contexto-produto, `_indice.md`, docs de negócio e seus
+  `grill-negocio.<slug>.md` aprovados.
+- Um doc sem gate aprovado não entra como fluxo documentado; aparece em “em revisão”.
+- Pode escrever `.arquitetura/grills/visao.md` e
+  `docs/00-dominio/visao-de-produto.md`.
+- Não cria narrativa entre fluxos, não inventa jornada, não reescreve one-liner aprovado
+  e não chama inventário de entrypoints de “total de fluxos do produto”.
+- Se não houver nenhum fluxo de negócio aprovado, pare `BLOQUEADO`.
 
-> **Uma visão que liga, não que inventa.**
-> - **O QUÊ de cada fluxo** você **herda** do doc de negócio `docs/00-dominio/fluxos-negocio/<slug>.md` (que já passou pelo `grill-negocio`). O one-liner de cada fluxo no mapa é o **próprio "Em uma frase"** daquele doc — você **cita, não reescreve**. Ancorar aqui é ancorar em verdade-de-produto já aprovada. A cadeia fica: **Visão → doc de negócio → doc técnico (`arquivo:linha`)**.
-> - **O que o produto É no todo** (o parágrafo de síntese) nenhum fluxo isolado prova. Entra como **`[inferido do código · a confirmar]`**, base = **o conjunto de fluxos documentados + o propósito elicitado** no `contexto.md` / `contexto-produto.md`. Nunca como fato.
-> - **Personas e jobs** você herda do `contexto-produto` **com a marcação que eles já têm** (atribuído OU inferido-com-base) — não re-afirma como fato novo.
-> - **Zero código na prosa.** A PO nunca vê `arquivo:linha` nem nome de classe. A âncora à verdade é o **link** pro doc de negócio + a **tabela de trace** no rodapé (recolhível).
-> - **Nada de narrativa cross-flow fabricada.** Não costure um "dia na vida" que atravesse fluxos que os docs não conectam — inventar um caminho entre fluxos é ficção. Se ilustrar, aponte pro exemplo do próprio doc de um fluxo.
+## Modelo de verdade
 
-## Insumos
+- O one-liner de cada fluxo é cópia exata do `## Em uma frase` do doc aprovado.
+- A síntese do produto é `[inferido do código · a confirmar]`, baseada no propósito
+  atribuído + conjunto explicitamente listado de fluxos aprovados.
+- Personas, jobs, termos e regras preservam IDs e estados do contexto-produto.
+- Toda afirmação recebe `VISAO-###` no Trace.
+- `ARC/CON` continuam vigentes; a visão não vende restrição como benefício sem fonte.
 
-- `.arquitetura/contexto-produto.md` — personas, jobs, glossário de produto (a fonte do vocabulário e de quem usa).
-- `.arquitetura/contexto.md` — tier, propósito no vocabulário do domínio, blast radius, restrições (a fonte do "o que é" no todo).
-- **Todos** os docs de negócio já escritos: `docs/00-dominio/fluxos-negocio/*.md` (o QUÊ herdado — a fonte de cada linha do mapa e do one-liner citado).
-- `.arquitetura/mapa/_indice.md` — a tabela de cobertura (quantos módulos/entrypoints o mapa conhece) — a base pra nota de cobertura e pra lista "ainda sem doc".
+## Cobertura sem falsa precisão
 
-## A grill de produto (o interrogatório — nível app)
+Calcule e publique separadamente:
 
-Diferente do `documentar-negocio` (que grelha passo a passo), aqui você grelha o **app inteiro**. Responda cada uma no doc — herdado / atribuído / inferido-marcado:
+1. **Docs aprovados `N`:** quantidade de `FLUXO-<slug>` com gate de negócio aprovado.
+2. **Entrypoints cobertos `C/E`:** `E` = entrypoints concretos `ENTRY-###` do inventário;
+   `C` = entrypoints associados a pelo menos um desses fluxos aprovados.
+3. **Limitações:** `ENTRY-DINAMICO-###` não entra em `E`, pois representa cardinalidade
+   desconhecida. Liste-o, além de duplicidades, relações muitos-para-muitos e áreas que
+   o inventário admite não enxergar.
 
-| | Pergunta de produto | Onde a resposta mora |
-|---|---|---|
-| **O que é** | em 1-2 frases, o que este produto faz no mundo? | *O que é* (inferido + base: fluxos + propósito) |
-| **Pra quem** | quem usa e que job cada um tem? | *Pra quem é* (herdado do contexto-produto) |
-| **Quais fluxos** | quais são os fluxos principais — e qual o job de cada? | *Os fluxos principais* (herdado: "Em uma frase" de cada doc) |
-| **O que falta** | quais fluxos o mapa conhece mas ainda não têm doc? | *Os fluxos principais* → "ainda sem doc" (inferido + base: `_indice.md`) |
-| **Que palavras** | que termos a PO precisa aprender pra ler isto? | *Vocabulário* (herdado do glossário) |
+Nunca escreva “N de M fluxos” usando `M` de módulos ou entrypoints. Um doc pode cobrir
+vários entrypoints e um entrypoint pode iniciar mais de um fluxo.
 
-Um "o que falta" respondido "nada" só vale se o `_indice.md` **confirma** que todo módulo/entrypoint já virou doc de negócio. Senão, você não olhou a cobertura.
+## Fase 1 · Gere o grill sistêmico específico deste projeto
 
-## A linguística (como escrever)
+Use `síntese`, `personas/jobs`, `fronteiras compartilhadas`, `compromissos`, `cobertura`
+e `lacunas` como **lentes**, não como perguntas prontas.
 
-- **Zero jargão / zero nome de código** na prosa (mesma régua do `documentar-negocio`). `endpoint` → "porta de entrada"; nome de classe → o termo de produto do glossário.
-- **POV da PO.** "Você entra e entende o que o produto faz e por onde começar", não "o índice de domínio lista os fluxos".
-- **Voz ativa, ator nomeado, uma ideia por frase.** Sujeito concreto (a persona, o produto) — nunca "isso/aquilo".
-- **Só o vocabulário do glossário** do `contexto-produto`, sempre o mesmo termo.
-- **Cita o "Em uma frase"** de cada doc de negócio como one-liner do fluxo — não reescreve (reescrever desancoraria do que o `grill-negocio` aprovou).
+### 1.1 · Encontre gatilhos cross-flow reais
 
-## Saída · `docs/00-dominio/visao-de-produto.md`
+Cruze os `FLUXO/ENTRY`, one-liners, `PER/JOB/TERMO/REGRA`, `ARC/CON`, fronteiras e
+pendências dos grills de negócio. Gatilhos típicos:
 
-Publicável (Camada 0 · Domínio — a porta de entrada). Frontmatter Docusaurus + o esqueleto abaixo. **Toda linha do mapa e toda afirmação de síntese tem base no Trace.**
+- dois fluxos usam o mesmo termo com resultados ou regras diferentes;
+- a mesma `FRONTEIRA` aparece em vários ledgers com ownership/falha divergente;
+- persona/job existe no contexto, mas nenhum fluxo aprovado a representa;
+- um `ARC/CON` afeta vários fluxos de formas diferentes;
+- a síntese proposta depende de uma conexão que nenhum artefato prova;
+- `ENTRY-###` descoberto torna uma afirmação de completude enganosa.
+
+### 1.2 · Gere `PERG-VISAO-###`
+
+Cada pergunta deve citar os fluxos, IDs, termos ou documentos concretos que a dispararam;
+declarar jurisdição `artefato-aprovado` ou `humano`; explicar o efeito sobre síntese,
+risco ou cobertura; e definir a prova/decisão que a encerra.
+
+Não pergunte genericamente “o que é o produto?” ou “quem ficou fora?”. Pergunte, por
+exemplo: “`JOB-004` pertence a `PER-002`, mas nenhum dos fluxos aprovados associados aos
+`ENTRY-003/007` o cobre: ele está fora do produto observado ou falta priorizar um fluxo
+de documentação?”. Só use IDs que existam no projeto.
+
+Lente sem sinal fica `não acionada` com as fontes inspecionadas. Ausência só gera pergunta
+quando muda materialmente a honestidade da visão.
+
+### 1.3 · Resolva em loop
+
+1. Resolva o que os artefatos aprovados conseguem provar.
+2. Gere follow-ups quando a comparação revelar contradição ou nova lacuna.
+3. Pergunte ao humano apenas sobre significado, prioridade, risco aceito ou autoridade,
+   sempre com os casos concretos já comparados. Persista a fila, espere e registre a
+   resposta antes de sintetizar.
+4. Pergunta de artefato aberta bloqueia a visão; pergunta humana pode permanecer
+   `aguardando-humano` se a síntese declarar a limitação.
+5. Síntese não é soma de one-liners e não cria causalidade entre fluxos.
+
+### 1.4 · Grave o grill
+
+Grave `.arquitetura/grills/visao.md`:
+
+```md
+# Grill sistêmico — visão de produto
+> Mapa: <snapshot/frescor> · Gates de negócio: <lista>
+
+## Cobertura das lentes
+| Lente | Sinais concretos inspecionados | Estado | Perguntas |
+|---|---|---|---|
+| <lente> | <FLUXO/ENTRY/PER/JOB/FRONTEIRA/ARC/CON> | acionada / não acionada com evidência | `PERG-VISAO-###` / — |
+
+## Perguntas específicas
+| ID | Pergunta | Gatilho/base | Jurisdição | Por que importa | Critério de encerramento | Derivada de | Estado | Resposta/base |
+|---|---|---|---|---|---|---|---|---|
+| `PERG-VISAO-001` | <pergunta cross-flow concreta> | <IDs/docs> | artefato-aprovado/humano | <efeito> | <prova/decisão> | — | aberta / resolvida / aguardando-humano / descartada | <resposta> |
+```
+
+Preserve IDs em reexecuções; perguntas sobre novos fluxos são anexadas.
+
+## Fase 2 · Linguagem
+
+- Use o glossário e preserve IDs no Trace, não necessariamente na prosa.
+- Voz ativa, ator nomeado, uma ideia por frase.
+- Zero código na prosa. Pares técnico→produto só na seção Vocabulário, se já aprovados.
+- One-liner é citado literalmente; discrepância deve ser resolvida no doc de origem.
+- Se cobertura for parcial, diga “visão atual/observada”, nunca “o app inteiro”.
+
+## Saída
 
 ```md
 ---
 sidebar_position: 1
-title: "Visão de Produto: <nome do app>"
-description: "<uma linha, em linguagem de negócio: o que o app é e pra quem>"
+title: "Visão de Produto: <nome>"
+description: "<síntese do domínio observado e público>"
 ---
 
-# <nome do app> — visão de produto
-
-> A porta de entrada do domínio. Pra uma PO nova entender o **app inteiro** — não um fluxo só. Sem código. Cada fluxo aponta pro seu doc de negócio.
+# <nome> — visão de produto
+> Visão progressiva do domínio. Base atual: <N> fluxos de negócio aprovados.
 
 ## O que é
-<1-2 frases: o que o produto é no todo, no vocabulário do domínio — [inferido do código · a confirmar] + base>
+<síntese [inferido do código · a confirmar] + indicação de base>
 
 ## Pra quem é
-<as personas do contexto-produto, em prosa, cada uma com o job que resolve — marcação herdada>
+<personas/jobs e estado herdado; ausências relevantes>
 
-## Vocabulário
-<só os termos de topo que esta visão usa; 1 frase simples cada (técnico: `<par>`) — marcação herdada do glossário>
+## Vocabulário e regras essenciais
+<termos/regras do contexto-produto usados nesta visão>
 
-## Os fluxos principais
+## Fluxos documentados
+| Fluxo | O que faz pra você | EntryPoints cobertos | Doc |
+|---|---|---|---|
+| <nome> | <cópia exata de Em uma frase> | `ENTRY-###` | [ver fluxo](fluxos-negocio/<slug>.md) |
 
-<Documentados — tabela: cada fluxo linkado + o "Em uma frase" citado do doc de negócio:>
+## Fronteiras e riscos compartilhados
+<somente relações comprovadas pelos ledgers; ownership/pendências visíveis>
 
-| Fluxo | O que faz pra você | Doc |
-|---|---|---|
-| <nome legível> | <"Em uma frase" citado do doc de negócio> | [ver fluxo](fluxos-negocio/<slug>.md) |
+## Cobertura e fila de documentação
+- Docs de negócio aprovados: **<N>**.
+- EntryPoints candidatos cobertos: **<C>/<E>**.
+- Em revisão: <docs sem gate aprovado>.
+- Descobertos sem doc aprovado: <ENTRY-IDs + hipótese marcada>.
+- Limitações do inventário: <lista>.
 
-**Cobertura:** esta visão cobre <N> de ~<M> fluxos/entrypoints que o mapa conhece. Os demais ainda não têm doc de negócio — são a fila de trabalho:
-
-<Ainda sem doc de negócio — [inferido do código · a confirmar], base: `_indice.md`:>
-- <nome provável do fluxo/entrypoint> — ainda sem doc
+## Decisões e lacunas humanas
+<`PERG-VISAO-###` / LACUNA / DECISAO-PENDENTE com dono e impacto>
 
 ## Trace
-
-<recolhível — a prova de que nada é ficção; cada linha do mapa e cada síntese → sua base>
-```
-
-O bloco **Trace** usa `<details>` do MDX pra recolher:
-
-```md
 <details>
-<summary>Trace — cada afirmação e sua base (a PO não precisa; o cético clica)</summary>
+<summary>Trace — cada afirmação e sua base</summary>
 
-| Afirmação (seção) | Tipo | Base | Estado |
-|---|---|---|---|
-| <fluxo X no mapa — one-liner> | o quê | `docs/00-dominio/fluxos-negocio/<slug>.md` §Em uma frase | herdado-verificado |
-| <"o que é" — a síntese> | síntese | conjunto de fluxos documentados + `contexto.md` §Propósito | inferido-a-confirmar |
-| <cobertura N de ~M> | cobertura | `.arquitetura/mapa/_indice.md` (tabela de cobertura) | inferido-a-confirmar |
-| <persona / job> | pra quem | `contexto-produto.md` §Personas / §Jobs | herdado (atribuído/inferido lá) |
+| ID | Afirmação/seção | Tipo | Base | Estado |
+|---|---|---|---|---|
+| `VISAO-001` | <one-liner> | fluxo | `<doc>` §Em uma frase + `<gate>` | herdado-verificado |
+| `VISAO-002` | <síntese> | síntese | <propósito + lista de fluxos> | inferido-a-confirmar |
+| `VISAO-003` | cobertura C/E | cobertura | `_indice.md` + associações dos fluxos | calculado-verificado |
 
 </details>
 ```
 
-## Critério de conclusão (checável e exaustivo)
+## Critério de conclusão
 
-- `docs/00-dominio/visao-de-produto.md` existe, com o esqueleto completo (*O que é · Pra quem é · Vocabulário · Os fluxos principais + Cobertura · Trace*).
-- **Zero** nome de classe/arquivo/método/`arquivo:linha` na prosa (fora do bloco Trace recolhível).
-- **Todo** fluxo documentado no mapa: o **link resolve** para um `docs/00-dominio/fluxos-negocio/<slug>.md` que existe, o one-liner é **idêntico** ao "Em uma frase" daquele doc, e tem linha no Trace com estado `herdado-verificado`.
-- O **"O que é"** está marcado `[inferido do código · a confirmar]` **com base** (conjunto de fluxos + propósito) — **nunca** como fato.
-- A **cobertura** está declarada (`N de ~M`); a lista "ainda sem doc" é `[inferido do código · a confirmar]` com base no `_indice.md` **ou** atribuída (se um humano a deu). Nada de silêncio que faça a fatia parecer o app inteiro.
-- **Personas e jobs** entram com a **marcação herdada** do `contexto-produto` — zero re-afirmação como fato.
-- O vocabulário é **só** o do glossário do `contexto-produto`, e cobre os termos que a visão usa.
-- **Nenhuma** narrativa cross-flow fabricada (nenhum caminho entre fluxos que os docs não têm).
+- Todo fluxo listado tem gate de negócio aprovado e link resolvível.
+- `.arquitetura/grills/visao.md` existe e referencia exatamente os artefatos sintetizados.
+- Toda `PERG-VISAO-###` nasce de sinais concretos, com jurisdição, impacto e critério;
+  zero pergunta genérica copiada das lentes.
+- Perguntas de artefato estão resolvidas; pendências humanas limitam a síntese de modo visível.
+- As 6 lentes estão acionadas ou não acionadas com evidência.
+- Todo one-liner é byte a byte igual ao doc de origem.
+- `N` e `C/E` estão separados, recalculáveis e acompanhados das limitações.
+- Síntese, personas, jobs, regras e lacunas preservam estado/base.
+- Fronteiras compartilhadas só aparecem quando mais de um ledger as comprova.
+- Zero código/narrativa cross-flow inventada na prosa.
+- Todo conteúdo material tem `VISAO-###` no Trace.
 
 ## Handoff
 
-Imprima ao humano, literalmente:
-
-> Visão de produto gravada em `docs/00-dominio/visao-de-produto.md`, cobrindo <N> de ~<M> fluxos. Próximo passo: rode **`grill-visao`** apontando para ela, para os docs de negócio em `docs/00-dominio/fluxos-negocio/` e para `.arquitetura/mapa/_indice.md`.
+> Grill sistêmico gravado em `.arquitetura/grills/visao.md` e visão gravada com <N> docs aprovados e cobertura <C>/<E>. Próximo passo: rode **`grill-visao`** com o grill, a visão, o índice, os docs e os gates de negócio.

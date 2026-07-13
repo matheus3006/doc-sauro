@@ -1,82 +1,187 @@
 # Prompt · `bootstrap-contexto`
 
-> Passo 0 da trilha de documentação de arquitetura. Portável: roda em Amazon Q, GitHub Copilot ou Kiro — **standalone**, sem subagente, sem parser/ctags/tree-sitter. Leitura é **LLM-native**.
+> Passo 0 da trilha de documentação de arquitetura. Portável: roda em Amazon Q,
+> GitHub Copilot ou Kiro — **standalone**, sem subagente, sem parser/ctags/tree-sitter.
+> Leitura **LLM-native**.
 
-Você detecta **stack e estrutura** (retrato barato) e **elicita do humano** o que o código não conta. Produz `.arquitetura/contexto.md` — o arquivo que todo passo seguinte lê. Rode **uma vez por projeto**, na raiz do repositório.
+Você produz `.arquitetura/grills/contexto.md` e `.arquitetura/contexto.md`: detecta o que
+o repositório comprova sem abrir corpos de método, gera perguntas específicas a partir
+desses sinais e pede ao humano apenas o que domínio, operação e organização respondem.
 
-## Princípio-norte (inegociável)
+## Contrato de execução
 
-> O mapa e o depoimento humano são **hipóteses** — nunca viram citação sobre o que o código faz. A única fonte citável sobre **comportamento do código** é o próprio código (`arquivo:linha`). O que o humano diz entra **atribuído** (verbatim + quem + quando), nunca como "fato objetivo".
+- **Escopo:** um repositório, executado a partir da raiz.
+- **Pode escrever:** somente `.arquitetura/grills/contexto.md` e
+  `.arquitetura/contexto.md`.
+- **Não pode:** alterar código, escolher arquitetura nova, ratificar decisão humana ou
+  afirmar comportamento de runtime.
+- **Pré-condição:** a raiz deve ser identificável por manifestos, VCS ou estrutura.
+  Se houver mais de uma raiz plausível, pare com `BLOQUEADO` e liste as candidatas.
+- **Checkpoint humano obrigatório:** faça todas as perguntas de elicitação em um único
+  bloco e **pare**. Só grave depois da resposta. Se o humano disser que um item é
+  desconhecido/indisponível, registre `[PENDENTE: ...]`; silêncio não é resposta.
 
-Neste passo você ainda **não abre corpo de método** — logo, não afirma comportamento. Você inventaria nomes e ouve o humano. Nada aqui é "o código faz X".
+## Princípio-norte e jurisdição
 
-## Duas trilhas (não misture)
+> O mapa e o depoimento humano são hipóteses — nunca viram citação sobre o que o código
+> faz. A única fonte citável sobre comportamento é o próprio código (`arquivo:linha`).
 
-- **Extração** (código → contexto): enche **Stack** e **Estrutura**. Fonte = arquivos; toda afirmação carrega o arquivo que a comprova.
-- **Elicitação** (humano → contexto): enche **Tier**, **Propósito**, **Blast radius**, **Restrições** e **Padrões-que-não-se-aplicam**. Fonte = humano; registro **verbatim + atribuído**.
+- **Extração:** stack e estrutura vêm de arquivos; cada afirmação aponta a evidência.
+- **Elicitação:** propósito, domínio, operação, restrições e compromissos vêm do humano;
+  registre **verbatim + quem + quando**.
+- **Inferência estrutural:** convenção de nome/pasta pode sugerir um papel, mas entra
+  `[inferido]`. Neste passo, nenhuma inferência descreve comportamento.
+- **Conflito:** não escolha um lado em silêncio. Registre a divergência e sua jurisdição.
 
-## Passos
+## Fase 1 · Extração barata, sem corpo de método
 
-### 1 · Extração — retrato barato (sem abrir corpo de método)
+1. Liste a árvore até 2–3 níveis. Ignore `.git`, dependências, caches e artefatos de
+   build (`node_modules`, `target`, `dist`, `build`, `.next`, `vendor`, `venv`,
+   `__pycache__`).
+2. Determine stack e tooling apenas por manifestos/sinais explícitos (`package.json`,
+   `pom.xml`, `build.gradle`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `*.csproj`,
+   `Dockerfile`, arquivos de CI etc.). Cada item aponta o arquivo que o comprova.
+3. Liste módulos top-level e tipos de entrypoint visíveis por convenção: HTTP,
+   consumidor/listener, job, CLI, evento ou outro. Marque o papel `[inferido]`.
+4. Registre sinais de fronteira do sistema sem afirmar uso em runtime: SDKs, drivers,
+   manifests de infraestrutura e configurações de rede/fila/banco. Tudo como
+   `candidato [inferido]`, com evidência.
+5. Registre o commit/hash atual e se há working tree alterado. Commit identifica conteúdo
+   apenas com árvore limpa. Sem VCS ou com árvore alterada, declare que etapas com
+   citações deverão guardar fingerprint dos arquivos lidos; nunca invente frescor.
 
-1. Liste a árvore de pastas até ~2-3 níveis. Ignore build/deps: `node_modules`, `target`, `dist`, `build`, `.next`, `vendor`, `venv`, `__pycache__`, `.git`.
-2. Determine a **stack** pelos **manifestos e sinais de convenção**, não por adivinhação: `package.json` · `pom.xml` · `build.gradle` · `go.mod` · `Cargo.toml` · `requirements.txt`/`pyproject.toml` · `*.csproj` · `composer.json` · `Gemfile` · `Dockerfile`/`docker-compose.yml`. **Cada linguagem/framework afirmado carrega o arquivo que o comprova.**
-3. Inventarie os **tipos de entrypoint** por convenção — o vocabulário é **language-agnostic**: `entrypoint` (controller/handler/rota, listener de fila, job agendado, CLI `main`, consumer) · `módulo` (pasta/pacote top-level) · `unidade` (classe/arquivo) · `aresta-de-dependência` (uma unidade referencia outra). Liste os módulos top-level e, para cada um, o(s) tipo(s) de entrypoint que ele expõe.
+**Concluído quando:** Stack, Estrutura e Fronteiras candidatas têm evidência e não há
+afirmação de comportamento.
 
-**Concluído quando:** o bloco **Stack** (cada item com evidência = arquivo) e o bloco **Estrutura** (todos os módulos top-level + tipos de entrypoint) estão preenchidos, sem nenhuma afirmação de comportamento.
+## Fase 2 · Gere a elicitação específica deste projeto
 
-### 2 · Elicitação — pergunte ao humano
+As dez dimensões de cobertura são lentes, não perguntas prontas:
 
-Pergunte e **espere a resposta** antes de gravar. Registre cada resposta **verbatim + quem + quando**. Cinco itens:
+`propósito/sucesso` · `usuários` · `vocabulário/invariantes` · `casos-limite` ·
+`tier/blast radius` · `fronteiras/ownership` · `operabilidade` · `restrições` ·
+`compromissos/exceções` · `decisores`.
 
-1. **Tier / criticidade** — crítico pra receita? interno? experimental? regulado?
-2. **Propósito** — em uma frase, no vocabulário do **domínio** (o que faz), não da tecnologia (como faz).
-3. **Blast radius** — o que quebra às 3h da manhã se isso cair? quem é paginado? qual dependência externa, se sumir amanhã, derruba tudo?
-4. **Restrições fora do código** — compliance, política, contrato com vendor, prazo, orçamento. (O *porquê* puro o código não checa; só dá pra atribuir.)
-5. **Padrões que NÃO se aplicam** — o que parece o padrão da casa mas aqui é diferente de propósito. (O anti-template mais barato: evita a doc assumir o convencional.)
+### 2.1 · Cruze lentes com os sinais extraídos
 
-Item sem resposta → marque `[PENDENTE: <pergunta>]` e siga (**registra-e-segue**). **Nunca invente a resposta.**
+Para cada lente, use nome do projeto, módulos, entrypoints candidatos, SDKs, bancos,
+filas, manifests, CI e ausências materiais observadas. Gere `PERG-CTX-###` que mencione
+esses elementos. Se não houver sinal positivo, a própria ausência inspecionada pode ser
+o gatilho: “não encontrei owner/runbook nos caminhos X/Y” é específico; “quem monitora?”
+isoladamente não é.
 
-**Concluído quando:** o bloco **Elicitação** tem os 5 itens, cada um atribuído OU `[PENDENTE]`.
+É proibido copiar perguntas genéricas como “qual é o propósito?”, “quais são as
+restrições?” ou “quem aprova?”. Exemplo válido:
 
-### 3 · Grave `.arquitetura/contexto.md`
+> `PERG-CTX-004` — O repositório `<nome>` declara `<SDK>` em `<manifesto>` e um consumer
+> em `<módulo>`; esse fornecedor é uma fronteira crítica do fluxo ou apenas tooling? Quem
+> é dono do contrato e qual resultado precisa sobreviver se ele ficar indisponível?
 
-Interno, **fora de `docs/`** (não vai pro site). Use exatamente esta forma:
+### 2.2 · Registre e resolva a fila
+
+Grave `.arquitetura/grills/contexto.md` antes de perguntar:
 
 ```md
-# Contexto — <nome do projeto>
-> Interno. Insumo de toda a trilha. Extração carrega evidência; elicitação é atribuída.
-> Frescor: <data-hora> · <commit/hash se houver>
+# Grill de contexto — <projeto>
+> Frescor: <snapshot/estado da árvore> · Derivado da extração deste repositório
+
+## Cobertura das lentes
+| Lente | Sinais concretos inspecionados | Estado | Perguntas |
+|---|---|---|---|
+| <lente> | <módulos/manifests/fronteiras/ausências> | acionada / não acionada com evidência | `PERG-CTX-###` / — |
+
+## Perguntas específicas
+| ID | Pergunta | Gatilho/evidência | Jurisdição | Por que importa | Critério de encerramento | Derivada de | Estado | Resposta |
+|---|---|---|---|---|---|---|---|---|
+| `PERG-CTX-001` | <pergunta que nomeia este projeto> | <arquivo/módulo/ausência inspecionada> | arquivo/humano | <impacto> | <evidência/decisão> | — | aberta / resolvida / aguardando-humano / descartada | <verbatim + quem/quando> |
+```
+
+Resolva primeiro perguntas de jurisdição `arquivo`. Depois apresente em um único bloco
+somente as perguntas humanas abertas, com seus IDs, contexto e impacto, e **pare**. Ao
+receber respostas, preserve verbatim; ambiguidade relevante gera pergunta filha com novo
+ID. Atualize o arquivo do grill antes de cada espera e depois de cada resposta, para a
+fila não depender da memória do chat. Não transforme resposta em “boa prática”. Melhoria possível vira
+`DECISAO-PENDENTE-###`, nunca compromisso vigente.
+
+Uma lente pode ficar `não acionada` apenas com a evidência do que foi inspecionado. Não
+gere pergunta artificial nem use resposta genérica para completar cobertura.
+
+## Fase 3 · Grave `.arquitetura/contexto.md`
+
+Use esta estrutura. IDs são estáveis: preserve-os em reexecuções; acrescente novos no
+fim e nunca renumere itens já referenciados.
+
+```md
+# Contexto — <projeto>
+> Interno. Extração tem evidência; elicitação é atribuída.
+> Frescor: <data-hora> · commit <hash|indisponível> · working tree <limpo|alterado|desconhecido>
+> Política de snapshot: commit limpo OU fingerprint por arquivo citado
 
 ## Stack
 - <linguagem/framework/runtime> — evidência: `<arquivo>`
-  ...
 
 ## Estrutura
 - Raiz do código: `<path>`
 - Módulos top-level:
-  - `<módulo>` — entrypoints: <tipos> — evidência: `<arquivo/pasta>`
-  ...
+  - `<módulo>` — entrypoints candidatos: <tipos> `[inferido]` — evidência: `<path>`
 
-## Elicitação (atribuído)
-- **Tier:** "<verbatim>" — <quem>, <quando>
-- **Propósito:** "<verbatim>" — <quem>, <quando>
-- **Blast radius:** "<verbatim>" — <quem>, <quando>
-- **Restrições:** "<verbatim>" — <quem>, <quando>
-- **Padrões que não se aplicam:** "<verbatim>" — <quem>, <quando>
-  <ou> [PENDENTE: <pergunta>]
+## Fronteiras candidatas (extração; ainda não provam runtime)
+| ID | Candidato | Tipo | Evidência | Estado |
+|---|---|---|---|---|
+| `FRONTEIRA-CAND-001` | <sistema/SDK> | <rede/banco/fila/fs/...> | `<arquivo>` | `[inferido]` |
+
+## Modelo de domínio (atribuído)
+- **Propósito e sucesso:** "<verbatim>" — <quem>, <quando>
+- **Usuários/atores:** "<verbatim>" — <quem>, <quando>
+- **Termos:** "<verbatim>" — <quem>, <quando>
+- **Invariantes:** "<verbatim>" — <quem>, <quando>
+- **Casos-limite:** "<verbatim>" — <quem>, <quando>
+
+## Sistema e operação (atribuído)
+- **Tier / impacto:** "<verbatim>" — <quem>, <quando>
+- **Blast radius / recuperação:** "<verbatim>" — <quem>, <quando>
+- **Upstream / downstream / ownership:** "<verbatim>" — <quem>, <quando>
+- **Sinais / alertas / SLO / runbook:** "<verbatim>" — <quem>, <quando>
+
+## Restrições
+| ID | Tipo | Restrição (verbatim) | Fixa/negociável | Aprovação | Consequência | Fonte |
+|---|---|---|---|---|---|---|
+| `CON-001` | técnica/organizacional/negócio/compliance/política | <texto> | <estado> | <quem> | <efeito> | <quem, quando> |
+
+## Constituição arquitetural
+| ID | Compromisso vigente | Rationale/fonte | Como pode mudar | Estado |
+|---|---|---|---|---|
+| `ARC-001` | <contrato/padrão a preservar> | <quem/artefato> | <aprovação necessária> | ratificado / pendente |
+
+## Exceções ao padrão
+- <verbatim> — <quem>, <quando>
+
+## Decisores e revisão humana
+- Contexto: <quem> · Autoridade: <quem> · Revisão da doc: <quem>
+
+## Pendências e divergências
+- `[PENDENTE: PERG-CTX-### — <pergunta concreta> · dono: <quem|desconhecido>]`
+- `DECISAO-PENDENTE-001` — <melhoria/trade-off a decidir; não ratificada>
 ```
 
-## Critério de conclusão (checável)
+Para qualquer campo sem resposta explícita, use `[PENDENTE: pergunta · dono]`. Não use
+“N/A” a menos que o humano tenha confirmado que não se aplica.
 
-- `.arquitetura/contexto.md` existe.
-- **Todo** item de Stack tem evidência (arquivo).
-- Estrutura lista **todos** os módulos top-level.
-- Elicitação tem os **5** itens — cada um atribuído ou `[PENDENTE]`.
-- **Zero** afirmação de comportamento de código no arquivo.
+## Critério de conclusão
+
+- `.arquitetura/grills/contexto.md` e `.arquitetura/contexto.md` existem e registram frescor.
+- Toda `PERG-CTX-###` nomeia sinais/ausências reais do projeto, possui gatilho,
+  jurisdição, impacto e critério de encerramento; zero pergunta estática copiada da lente.
+- Perguntas de arquivo estão resolvidas; humanas abertas viram `[PENDENTE]` com dono/impacto.
+- As 10 lentes estão acionadas ou não acionadas com evidência.
+- Stack, módulos e fronteiras candidatas têm evidência; papéis inferidos estão marcados.
+- As respostas necessárias ao contexto estão atribuídas ou `[PENDENTE]`.
+- Restrições usam `CON-###` e distinguem fixa/negociável e aprovação, mesmo que pendente.
+- Compromissos vigentes usam `ARC-###`; melhorias não aprovadas usam
+  `DECISAO-PENDENTE-###`.
+- Zero afirmação de comportamento do código.
 
 ## Handoff
 
-Imprima ao humano, literalmente:
+Imprima literalmente:
 
-> Contexto gravado em `.arquitetura/contexto.md`. Próximo passo: rode o prompt **`mapear-estrutura`** na raiz do repositório.
+> Grill específico gravado em `.arquitetura/grills/contexto.md` e contexto em `.arquitetura/contexto.md`. Pendências humanas: <n>. Próximo passo: rode **`mapear-estrutura`** na raiz do repositório.

@@ -1,5 +1,9 @@
 # Piloto — fluxo Wakeup → Run → Settle (agente-orquestrator)
 
+> **Baseline histórica:** estes artefatos provam o slice original. Os prompts foram
+> fortalecidos depois com IDs estáveis, gates persistentes, validação semântica de
+> citação e cobertura `C/E`; este piloto ainda não foi reexecutado nessa versão.
+
 Prova de campo do slice vertical: rodei os 5 prompts de [`../prompts/`](../prompts/) contra um repo
 real e um fluxo crítico real, produzindo **1 doc de fluxo** que passa os gates.
 

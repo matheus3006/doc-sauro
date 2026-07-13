@@ -23,7 +23,7 @@ USO:
     python3 empacotar.py            # (re)gera dist/ a partir de prompts/
     python3 empacotar.py --verify   # verifica paridade + frontmatter (não escreve nada)
 
-Repetível: descobre os prompts por glob. Quando os 9 geradores futuros da trilha
+Repetível: descobre os prompts por glob. Quando novos geradores da trilha
 entrarem em prompts/, são empacotados sem tocar neste arquivo.
 """
 
@@ -206,6 +206,96 @@ def _validate_frontmatter(rel, fm, body):
     return probs
 
 
+def _validate_canonical_prompt(name, text):
+    """Invariantes arquiteturais mínimos de cada prompt standalone."""
+    probs = []
+    expected_title = f"# Prompt · `{name}`\n"
+    if not text.startswith(expected_title):
+        probs.append(f"prompts/{name}.md: título canônico esperado {expected_title.strip()!r}")
+    required = {
+        "marcador standalone": "**standalone**",
+        "critério verificável": "## Critério de conclusão",
+        "handoff explícito": "## Handoff",
+    }
+    for label, marker in required.items():
+        if marker not in text:
+            probs.append(f"prompts/{name}.md: falta {label} ({marker!r})")
+    if not any(marker in text for marker in (
+        "## Contrato de execução",
+        "## Contrato e saída",
+        "## Pré-condições",
+    )):
+        probs.append(f"prompts/{name}.md: falta contrato de execução ou pré-condições")
+    if name.startswith("grill-") and f".arquitetura/gates/{name}" not in text:
+        probs.append(f"prompts/{name}.md: gate não declara saída persistente")
+    semantic_markers = {
+        "bootstrap-contexto": ("ARC-###", "CON-###", "PERG-CTX-###", "Cobertura das lentes"),
+        "mapear-estrutura": ("ENTRY-###", "FLUXO-<slug>", "PERG-CTX-###", ".arquitetura/grills/contexto.md"),
+        "documentar-fluxo": ("PASSO-###", "ARESTA-###", "FRONTEIRA-###", "PERG-TEC-###", "Cobertura das lentes"),
+        "grill-doc": ("CITACAO-NAO-SUSTENTA", "RISCO-OCULTO", "PERG-TEC-###"),
+        "grill-mermaid": ("SETA-INVENTADA", "ARESTA-AUSENTE", "snapshot"),
+        "revisar-arquitetura": (
+            "OPORT-ARQ-###",
+            "PERG-ARQ-###",
+            "deletion test",
+            "Top recommendation",
+            "$TMPDIR",
+            "Strong",
+            "Worth exploring",
+            "Speculative",
+            ".arquitetura/revisoes/arquitetura.<escopo>.md",
+            "Qual dessas oportunidades você quer explorar?",
+        ),
+        "contexto-produto": ("PER-###", "JOB-###", "TERMO-###", "REGRA-###"),
+        "documentar-negocio": ("NEG-###", "PERG-NEG-###", "Cobertura das lentes"),
+        "grill-negocio": ("INFERENCIA-PROMOVIDA", "PERG-NEG-###", "PERGUNTA-GENERICA"),
+        "documentar-visao": ("VISAO-###", "PERG-VISAO-###", "Cobertura das lentes"),
+        "grill-visao": ("UNIDADE-MISTURADA", "PERG-VISAO-###", "PERGUNTA-GENERICA"),
+    }
+    for marker in semantic_markers.get(name, ()):
+        if marker not in text:
+            probs.append(f"prompts/{name}.md: falta marcador semântico {marker!r}")
+    dynamic_grill_paths = {
+        "bootstrap-contexto": ".arquitetura/grills/contexto.md",
+        "documentar-fluxo": ".arquitetura/grills/tecnico.<slug>.md",
+        "revisar-arquitetura": ".arquitetura/grills/arquitetura.<escopo>.<OPORT-ID>.md",
+        "documentar-negocio": ".arquitetura/grills/negocio.<slug>.md",
+        "documentar-visao": ".arquitetura/grills/visao.md",
+    }
+    grill_path = dynamic_grill_paths.get(name)
+    if grill_path and grill_path not in text:
+        probs.append(f"prompts/{name}.md: não persiste o grill dinâmico em {grill_path}")
+    if grill_path:
+        protocol_markers = (
+            "perguntas prontas",
+            "Cobertura das lentes",
+            "Gatilho",
+            "Jurisdição",
+            "Por que importa",
+            "Critério de encerramento",
+            "Derivada de",
+            "Estado",
+        )
+        for marker in protocol_markers:
+            if marker not in text:
+                probs.append(
+                    f"prompts/{name}.md: grill dinâmico incompleto; falta {marker!r}"
+                )
+    gate_grill_inputs = {
+        "grill-doc": ".arquitetura/grills/tecnico.<slug>.md",
+        "grill-negocio": ".arquitetura/grills/negocio.<slug>.md",
+        "grill-visao": ".arquitetura/grills/visao.md",
+    }
+    required_grill = gate_grill_inputs.get(name)
+    if required_grill and required_grill not in text:
+        probs.append(f"prompts/{name}.md: gate não audita o grill {required_grill}")
+    if required_grill:
+        for marker in ("PERGUNTA-GENERICA", "PERGUNTA-SEM-GATILHO"):
+            if marker not in text:
+                probs.append(f"prompts/{name}.md: gate não bloqueia {marker}")
+    return probs
+
+
 def _name_from_rel(rel):
     stem = Path(rel).name
     for suffix in (".prompt.md", ".md"):
@@ -217,6 +307,10 @@ def _name_from_rel(rel):
 def verify():
     prompts = dict(read_prompts())
     problems = []
+    contract_problems = []
+    for name, text in prompts.items():
+        contract_problems.extend(_validate_canonical_prompt(name, text))
+    problems.extend(contract_problems)
 
     # (a) prova "sem edição à mão": regera em tmp e compara byte-a-byte com dist/.
     with tempfile.TemporaryDirectory() as tmp:
@@ -261,6 +355,8 @@ def verify():
     print(f"Alvos gerados (dist/, sem README):    {n_targets}  "
           f"(esperado {n_prompts} × {len(TARGETS)} = {n_prompts * len(TARGETS)})")
     print(f"Corpos idênticos ao canônico:         {parity_ok}/{n_targets}")
+    print(f"Contratos canônicos válidos:          "
+          f"{n_prompts - len({p.split(':', 1)[0] for p in contract_problems})}/{n_prompts}")
     print("-" * 68)
     if problems:
         print(f"RESULTADO: FAIL — {len(problems)} problema(s):")
@@ -270,6 +366,7 @@ def verify():
     print("RESULTADO: PASS")
     print("  ✓ dist/ é exatamente a saída do gerador (nenhum alvo editado à mão)")
     print("  ✓ todo corpo de alvo == prompt canônico (zero drift)")
+    print("  ✓ todo prompt cumpre o contrato arquitetural mínimo")
     print("  ✓ frontmatter válido pela convenção de cada ferramenta")
     return 0
 
@@ -319,12 +416,15 @@ def write_readme(base, prompts):
 SMOKE_TEST_MD = '''## Como invocar cada prompt (+ smoke-test manual)
 
 A cadeia roda **em sequência, um prompt por vez** — cada prompt termina imprimindo o
-próximo comando (handoff) e o mapa em `.arquitetura/` é o ledger entre as sessões:
+próximo comando (handoff); `.arquitetura/grills/` mantém as perguntas específicas, o
+mapa mantém o ledger e `.arquitetura/gates/` mantém aprovações entre sessões:
 
     bootstrap-contexto → mapear-estrutura → documentar-fluxo → grill-doc → grill-mermaid
+    [opcional] revisar-arquitetura
+    contexto-produto → documentar-negocio → grill-negocio → documentar-visao → grill-visao
 
-Por isso os 5 são **invocáveis (inclusão manual)**, não always-on: always-on injetaria
-os 5 em toda interação — bloat de contexto e quebra da sequência.
+Por isso os prompts da cadeia são **invocáveis (inclusão manual)**, não always-on: always-on
+injetaria todos em toda interação — bloat de contexto e quebra da sequência.
 
 > Rodar os prompts de ponta a ponta dentro de cada ferramenta é **passo humano**. Este
 > checklist só confirma que cada prompt está **invocável** no runtime certo.
@@ -335,7 +435,7 @@ Markdown puro, sem frontmatter: o arquivo inteiro é o prompt. Nome invocado = a
 - **CLI `q chat`** (lê a pasta do projeto): na raiz do repo, rode `q chat` e invoque `@bootstrap-contexto`.
 - **IDE plugin (VS Code/JetBrains)**: lê **só a pasta global** — copie os `.md` para `~/.aws/amazonq/prompts/` (ou cole o conteúdo à mão). Requer um `q`/plugin atual.
 
-- [ ] `/prompts list` (CLI) ou o menu `@` (IDE) mostra os 5 nomes.
+- [ ] `/prompts list` (CLI) ou o menu `@` (IDE) mostra os nomes da cadeia.
 - [ ] `@bootstrap-contexto` injeta o prompt e ele começa a rodar.
 
 ### GitHub Copilot — `.github/prompts/`
@@ -343,7 +443,7 @@ Arquivo `<nome>.prompt.md`; frontmatter `agent: 'agent'` (modo agente, para os p
 
 - Em **VS Code / Visual Studio / JetBrains**, abra o Copilot Chat e digite `/bootstrap-contexto` (nome = arquivo sem `.prompt.md`). Recurso em public preview.
 
-- [ ] Digitar `/` no chat lista os 5 prompts.
+- [ ] Digitar `/` no chat lista os prompts da cadeia.
 - [ ] `/bootstrap-contexto` roda e produz `.arquitetura/contexto.md`.
 
 ### Kiro — `.kiro/steering/`
