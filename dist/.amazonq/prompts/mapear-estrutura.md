@@ -1,93 +1,143 @@
 # Prompt · `mapear-estrutura`
 
-> Passo 1 da trilha. Portável (Amazon Q / Copilot / Kiro), **standalone**, sem subagente, sem parser/ctags/tree-sitter. Leitura **LLM-native**. Roda **uma vez por projeto**, depois de `bootstrap-contexto`.
+> Passo 1 da trilha. Portável (Amazon Q / Copilot / Kiro), **standalone**, sem
+> subagente, sem parser/ctags/tree-sitter. Leitura **LLM-native**. Roda uma vez por
+> projeto, depois de `bootstrap-contexto`.
 
-Você semeia o **mapa**: um aid de leitura barato, **nível-declaração**, interno. O mapa é o **ledger** da trilha — a única memória entre sessões. Ele **cresce progressivo, logo à frente das docs**: aqui você só faz a **semente L0-L1 + cobertura**; as camadas fundas enchem **lazy**, quando um fluxo passar por elas (isso é trabalho do `documentar-fluxo`, não seu).
+Você semeia `.arquitetura/mapa/`: um mapa interno, nível-declaração, que localiza o
+sistema e mantém o ledger entre sessões. Aqui também nasce o inventário de entrypoints
+candidatos — a unidade correta para medir cobertura sem confundir módulo com fluxo.
 
-## Princípio-norte (inegociável)
+## Contrato de execução
 
-> O mapa é **hipótese**. **NUNCA é citado numa doc.** A única fonte citável sobre comportamento do código é o próprio código (`arquivo:linha`). O mapa acelera a leitura; ele não prova nada.
+- **Pode ler:** `.arquitetura/contexto.md`, árvore, manifestos e declarações/assinaturas.
+- **Pode escrever:** somente `.arquitetura/mapa/`.
+- **Não pode:** abrir corpo de método, afirmar comportamento, alterar código ou criar
+  fluxo de negócio por inferência.
+- **Pré-condição:** `.arquitetura/grills/contexto.md` e `.arquitetura/contexto.md`
+  existem, compartilham frescor e identificam uma raiz única. Toda `PERG-CTX-###` de
+  jurisdição `arquivo` está resolvida; pendência humana está refletida no contexto. Se
+  faltar ou houver pergunta genérica/sem gatilho, pare `BLOQUEADO`. Se o snapshot mudou,
+  marque o mapa anterior `stale`; nunca reutilize frescor antigo.
+- **Snapshot:** commit só basta com árvore limpa. Em árvore alterada/sem VCS, crie um
+  manifest com fingerprint dos arquivos de declaração inspecionados e use
+  `manifest:<digest>` como Snapshot-ID do mapa.
 
-## Regras duras
+## Princípio-norte e compromissos
 
-- **Nunca abra corpo de método.** O mapa é nível-declaração: nomes de pasta/arquivo/classe/método + assinaturas visíveis + papel **inferido**. O corpo é lazy, via `documentar-fluxo`.
-- **Toda inferência carrega `[inferido]`.** Papel deduzido de nome/tipo/assinatura (ex.: `*Controller` = entrypoint HTTP) é hipótese marcada — não fato.
-- **Interno.** Grave em `.arquitetura/mapa/` — **fora de `docs/`**. Não vaza pro site.
-- Vocabulário **language-agnostic**: `entrypoint` · `módulo` (pasta/pacote top-level) · `unidade` (classe/arquivo) · `aresta-de-dependência` (uma unidade referencia outra).
+> O mapa é hipótese e nunca é citado como prova de comportamento. Código aberto no
+> ponto exato é a única evidência comportamental.
 
-## Status de um nó (o ledger)
+- Preserve todos os `ARC-###` e `CON-###` do contexto. Se a estrutura observada parece
+  contrariá-los, registre uma divergência; não “corrija” o compromisso.
+- Todo papel deduzido de nome, pasta, annotation ou assinatura recebe `[inferido]`.
+- IDs são persistentes: nunca renumere `ENTRY-###` porque outro artefato pode referi-los.
 
-`esqueleto` (só o nome existe) → `inferido` (papel/aresta deduzido de assinatura) → `verificado` \| `corrigido` (só o `documentar-fluxo` promove, lendo o corpo) · `stale` (o arquivo mudou depois do carimbo de frescor).
+## Unidades do mapa
 
-## Passos
+- **Módulo:** unidade estrutural top-level.
+- **`ENTRY-###`:** entrypoint candidato observável por declaração (rota/handler,
+  listener/consumer, job, CLI, evento etc.). É hipótese até o corpo ser rastreado.
+- **`FLUXO-<slug>`:** intenção ponta-a-ponta confirmada pelo humano e rastreada depois.
+  Um fluxo pode começar em mais de um entrypoint; um entrypoint pode participar de mais
+  de um fluxo. Por isso `ENTRY` e `FLUXO` nunca são contados como sinônimos.
 
-### 1 · Semente L0-L1 + cobertura
+Status de nó: `esqueleto → inferido → verificado | corrigido`; `stale` é um marcador
+ortogonal de frescor. Status de entrypoint: apenas `candidato → confirmado`. Aprovação
+pertence à relação `FLUXO ↔ ENTRY + gate`, não ao entrypoint isolado: um mesmo entrypoint
+pode iniciar fluxos com maturidades diferentes.
 
-Leia `.arquitetura/contexto.md`. A partir da raiz do código que ele aponta:
+## Fase 1 · Árvore e cobertura estrutural
 
-1. Monte a árvore **L0** (repo) → **L1** (módulos top-level e um nível de submódulo). Não desça a arquivos ainda.
-2. Para **cada** módulo top-level, deduza os tipos de `entrypoint` que ele expõe (por convenção de nome/pasta), marcando `[inferido]`.
-3. Escreva a **tabela de cobertura** — uma linha por módulo top-level: `módulo | entrypoints (inferidos) | status | fluxos que já o cobriram | frescor`. No começo todo módulo é `esqueleto` e "fluxos" está vazio.
+1. Leia o contexto inteiro, inclusive modelo de domínio, restrições e constituição.
+2. Monte árvore L0–L1: repo, módulos top-level e um nível de submódulo.
+3. Crie uma linha de cobertura estrutural por módulo. Essa tabela responde “que parte do
+   código foi tocada?”, não “quantos fluxos existem?”.
 
-**Concluído quando:** `_indice.md` tem a árvore L0-L1 e a tabela de cobertura com **uma linha por módulo top-level**.
+## Fase 2 · Inventário barato de entrypoints candidatos
 
-### 2 · Stubs por módulo — **lazy, no primeiro toque** (não eager)
+Examine nomes, pastas, annotations e assinaturas, sem corpo. Liste cada entrypoint
+candidato com localização exata. Se duas declarações parecem o mesmo entrypoint, não
+mescle sem prova; registre relação provável. Se uma rota é gerada dinamicamente e não
+pode ser enumerada, crie uma linha `ENTRY-DINAMICO-###` e declare a limitação.
 
-A semente **não** enumera as unidades dos 14 módulos de uma vez — isso seria "mapear o repo inteiro", o oposto de barato. O stub de um módulo nasce **quando o primeiro fluxo o toca** (o `documentar-fluxo` cria/estende ao promover unidades). Aqui você só pode **adiantar** o stub de um módulo se ele for o alvo óbvio do próximo passo.
+Para cada candidato, registre:
 
-Um stub `.arquitetura/mapa/<módulo>.md`, quando criado, tem:
+- ID estável `ENTRY-###`;
+- tipo e localização (`arquivo:linha` da declaração quando disponível);
+- nome provável no domínio, sempre `[inferido]`;
+- módulo proprietário e interface/contrato visível na assinatura;
+- status e documentos associados, inicialmente vazios.
 
-- as **unidades** visíveis (classes/arquivos — L2), status `esqueleto`;
-- onde o **papel** for barato de inferir do nome/tipo (`*Controller`, `*Service`, `*Repository`, `*Listener`, `*Config`…), anotado com `[inferido]`;
-- a nota: *"assinaturas (L3) e arestas (L4) enchem **lazy** quando um fluxo passar por aqui."*
+Esse inventário é deliberadamente nível-declaração. Ele fornece o denominador `E` de
+entrypoints conhecidos; não promete conhecer todos os fluxos de negócio.
 
-Nunca liste membros/assinaturas de tudo. Liste só o que enxerga sem esforço; o resto é lazy.
+## Fase 3 · Stubs por módulo, lazy
 
-**Concluído quando:** o módulo alvo do próximo passo tem stub (os demais nascem no toque); toda unidade listada tem status e todo papel/aresta inferido carrega `[inferido]`.
-
-### 3 · Carimbo de frescor
-
-Em cada arquivo do mapa, registre `Frescor: <data-hora> · <commit/hash se houver>`. É o que permite marcar `stale` depois.
+Crie stub detalhado apenas para o módulo do próximo fluxo, se ele for conhecido. Os
+demais nascem no primeiro toque. O stub lista unidades L2 visíveis, papéis `[inferido]`
+e a nota de que assinaturas/arestas profundas serão preenchidas por fluxo. Não enumere
+o repositório inteiro por zelo aparente.
 
 ## Forma dos arquivos
 
-`_indice.md`:
-```md
-# Mapa — índice (L0-L1)
-> Interno. Ledger da trilha. NUNCA citado numa doc. Frescor: <data-hora> · <hash>
+`.arquitetura/mapa/_indice.md`:
 
-## Árvore
+```md
+# Mapa — índice
+> Interno. Hipótese/ledger; NUNCA citado como prova de comportamento.
+> Frescor: <data-hora> · Snapshot: `commit:<hash>` / `manifest:<digest>` · working tree <estado>
+
+## Árvore L0-L1
 - <repo>
   - `<módulo>/`
-    - `<submódulo>/`
-    ...
 
-## Cobertura
-| Módulo | Entrypoints (inferidos) | Status | Fluxos que cobriram | Frescor |
+## Cobertura estrutural (módulos)
+| Módulo | Papel `[inferido]` | Status | Fluxos que tocaram | Frescor |
 |---|---|---|---|---|
-| `<módulo>` | <tipos> `[inferido]` | esqueleto | — | <hash> |
+| `<módulo>` | <papel> | esqueleto | — | <hash> |
+
+## Inventário de entrypoints candidatos
+| ID | EntryPoint / declaração | Tipo | Módulo | Hipótese de domínio | Status | Fluxos/docs/gates associados | Frescor |
+|---|---|---|---|---|---|---|---|
+| `ENTRY-001` | `<arquivo:linha>` | HTTP/fila/job/CLI/evento/outro | `<módulo>` | <nome> `[inferido]` | candidato | — | <hash> |
+
+## Limitações do inventário
+- <entrypoints dinâmicos, geração de código, módulos não inspecionáveis etc.>
+
+## Divergências com contexto/constituição
+- <observação × `ARC-###`/`CON-###`, sem resolver em silêncio; ou "nenhuma">
 ```
 
-`<módulo>.md`:
+`.arquitetura/mapa/<módulo>.md`:
+
 ```md
 # Mapa — módulo `<módulo>`
-> Nível-declaração. Assinaturas e arestas enchem lazy por-fluxo. Frescor: <data-hora> · <hash>
+> Nível-declaração. Aprofundamento lazy por fluxo. Frescor: <hash>
 
 ## Unidades
-- `<Unidade>` — papel: <inferido> `[inferido]` — status: esqueleto
-  ...
+- `<Unidade>` — papel: <papel> `[inferido]` — status: esqueleto
+
+## Entrypoints
+- `ENTRY-###` — `<declaração arquivo:linha>` — status: candidato
+
+## Assinaturas e arestas
+- Enchem lazy quando um fluxo passar por aqui.
 ```
 
-## Critério de conclusão (checável)
+## Critério de conclusão
 
-- `.arquitetura/mapa/_indice.md` existe, com árvore L0-L1 **e** tabela de cobertura cobrindo **todos** os módulos top-level.
-- O módulo alvo do próximo passo tem stub; os demais nascem lazy no primeiro toque.
-- **Todo** papel/aresta inferido carrega `[inferido]`.
-- **Nenhum** corpo de método foi aberto; **nenhuma** afirmação de comportamento como fato.
-- Todo arquivo do mapa tem carimbo de frescor.
+- `_indice.md` existe, registra snapshot verificável e separa cobertura estrutural de inventário de
+  entrypoints.
+- Todos os módulos top-level aparecem na tabela estrutural.
+- Cada entrypoint observável tem ID estável, evidência de declaração e hipótese marcada.
+- Limitações/dinamicidade estão explícitas; `E` nunca é apresentado como total absoluto
+  de fluxos do produto.
+- Nenhum corpo de método foi aberto e nenhum comportamento foi afirmado.
+- O módulo alvo tem stub, se o alvo já foi informado.
 
 ## Handoff
 
-Imprima ao humano, literalmente:
+Imprima literalmente:
 
-> Mapa semeado em `.arquitetura/mapa/`. Próximo passo: rode **`documentar-fluxo`** informando **um** fluxo crítico e seu entrypoint (ex.: `"autorização de pagamento" — POST /payments`).
+> Mapa semeado em `.arquitetura/mapa/`: <E> entrypoints candidatos, com limitações: <resumo>. Próximo passo: rode **`documentar-fluxo`** informando **um** fluxo crítico e o `ENTRY-###`/entrypoint que o inicia.

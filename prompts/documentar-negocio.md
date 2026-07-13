@@ -1,106 +1,160 @@
 # Prompt · `documentar-negocio`
 
-> A joia do **track de negócio**. Portável (Amazon Q / Copilot / Kiro), **standalone**, sem subagente, sem parser. Roda **um por fluxo**, depois do `contexto-produto`, sobre um fluxo que o **track técnico já documentou e aprovou**.
+> A joia do track de negócio. Portável (Amazon Q / Copilot / Kiro), **standalone**,
+> sem subagente e sem parser. Roda uma vez por fluxo tecnicamente aprovado.
 
-Você **reescreve um fluxo já rastreado em linguagem de negócio**, pra uma **PO nova** entender o que o app faz e por quê — **sem ver uma linha de código**. Não é resumo do doc técnico: é uma **tradução ancorada**. O QUÊ você **herda** do doc técnico (já verificado); o PORQUÊ você **elicita ou infere-e-marca**; e você **prova a fidelidade** por uma tabela de trace escondida.
+Você traduz um fluxo técnico para linguagem de negócio. Não é resumo livre: cada
+afirmação recebe `NEG-###` e aponta uma base aprovada. O texto explica o resultado para
+uma PO nova, sem expor implementação e sem inventar valor ou causalidade.
 
-> **Este prompt encoda dois comportamentos** que no Claude seriam skills e que **aqui não existem** — então estão escritos abaixo, não invocados:
-> 1. **Grill de produto:** interroga cada passo por **sentido de negócio** (job, impacto, regra, consequência, porquê); nunca aceita "só reescrever bonito".
-> 2. **Linguística:** escreve simples (POV do usuário, voz ativa, zero jargão) e traz **um exemplo real fiel** ao fluxo.
+## Contrato de execução
 
-## Princípio-norte (inegociável)
+- Insumos: contexto, contexto-produto, doc/ledger do fluxo e seus dois gates técnicos
+  aprovados no mesmo snapshot.
+- Pode escrever `.arquitetura/grills/negocio.<slug>.md` e
+  `docs/00-dominio/fluxos-negocio/<slug>.md`.
+- Não pode reabrir código para reinterpretar negócio, alterar o fluxo, criar conexão com
+  outro fluxo ou promover inferência a decisão.
+- Slug/`FLUXO`/`ENTRY` devem coincidir. Falha de gate, snapshot ou identidade → `BLOQUEADO`.
 
-> **Linguagem simples, mas ancorada — nunca ficção.**
-> - **O QUÊ (comportamento)** você **herda** do doc técnico `docs/03-fluxos/<slug>.md` (que já verificou com `arquivo:linha`). Reescreve em linguagem de gente; **não re-cita** código na prosa e **não contradiz** o doc técnico.
-> - **O PORQUÊ (valor / regra / decisão)** o código não prova. Entra **atribuído** (humano: verbatim + quem + quando) **ou** `[inferido do código · a confirmar]` — inferência **sempre com base** no que o fluxo mostra. Nunca inventado.
-> - **Zero código na prosa.** A PO nunca vê `arquivo:linha`. A âncora à verdade é o **link** pro doc técnico + a **tabela de trace** no rodapé (recolhível).
+## Modelo de verdade
 
-## Insumos
+- **O QUÊ:** herdado do doc técnico aprovado; Trace aponta `PASSO/BRANCH/FRONTEIRA`.
+- **O PORQUÊ:** `REGRA-###`/humano atribuído ou `[inferido do código · a confirmar]`
+  com base. Código não prova valor por si só.
+- **Linguagem:** usa apenas `PER/JOB/TERMO` do contexto-produto. Termo necessário mas
+  ausente vira `LACUNA`, não sinônimo improvisado.
+- **Compromissos:** preserve `ARC/CON`; sugestão incompatível vira decisão pendente.
+- **Zero código na prosa:** nomes técnicos e `arquivo:linha` só podem aparecer no Trace.
 
-- `.arquitetura/contexto.md` e `.arquitetura/contexto-produto.md` (persona, jobs, glossário de produto — a fonte do vocabulário).
-- **O doc técnico do fluxo:** `docs/03-fluxos/<slug>.md` (o QUÊ verificado) + `.arquitetura/mapa/fluxos/<slug>.grafo.md` (o grafo — as arestas reais).
-- **O fluxo** (o mesmo `<slug>` do doc técnico).
+## Fase 1 · Gere o grill de negócio específico deste fluxo
 
-## A grill de produto (o interrogatório — o coração)
+Use `job`, `resultado percebido`, `erro/impacto`, `regra`, `porquê/trade-off` e `limite`
+como **lentes**, nunca como perguntas prontas.
 
-Percorra o fluxo do doc técnico **passo a passo**. Em **cada** passo/branch com sentido de negócio (ignore utilitário puro), pergunte — e responda no doc, atribuído ou inferido-marcado:
+### 1.1 · Encontre gatilhos reais
 
-| | Pergunta de negócio | Onde a resposta mora |
-|---|---|---|
-| **Job** | que necessidade do usuário esse passo serve? | *Como funciona* / *Quem usa* |
-| **Impacto** | se falha, quem sente e como? | *Quando dá errado* |
-| **Regra** | esse guard/limiar é uma política de negócio? qual? | *Regras & porquês* |
-| **Consequência** | dá errado → perde dinheiro / cliente / compliance / confiança? | *Quando dá errado* |
-| **Porquê** | por que foi desenhado assim? | *Regras & porquês* (atribuído ou inferido + base) |
+Cruze `PASSO/BRANCH/FRONTEIRA` com `PER/JOB/TERMO/REGRA`, `ARC/CON`, inferências e
+lacunas do contexto-produto. Procure, por exemplo:
 
-Um passo com todos "N/A" é suspeito — provavelmente você não leu o passo técnico fundo o bastante. A âncora de cada resposta de **comportamento** é a **seção do doc técnico** (ou aresta do grafo) que a sustenta — vai na tabela de trace.
+- efeito técnico sem resultado perceptível associado a uma persona concreta;
+- branch de erro cujo impacto para `PER-###` não foi explicado;
+- condição técnica apresentada como `REGRA-###` sem dono ou porquê;
+- duas personas afetadas de formas diferentes pelo mesmo resultado;
+- fronteira externa cujo fracasso ameaça um job/restrição específica;
+- ponto em que a narrativa tenta atravessar o limite de `FLUXO-<slug>`.
 
-## A linguística (como escrever)
+### 1.2 · Gere `PERG-NEG-###`
 
-- **Zero jargão / zero nome de código** na prosa. `idempotente` → "não cobra duas vezes"; `PENDING_REVIEW` → "fica esperando um humano revisar".
-- **POV do usuário.** "Você pede o pagamento e vê 'processando'", não "o controller responde 202".
-- **Voz ativa, ator nomeado, uma ideia por frase.** Sujeito concreto (a persona, o sistema) — nunca "isso/aquilo".
-- **Só o vocabulário do glossário** do `contexto-produto`, sempre o mesmo termo.
-- **Um exemplo real, fiel.** Um cenário concreto e nomeado (*"Maria pede um pagamento de R$ 250…"*), **rotulado `Exemplo:`**, cujos **desfechos existem no grafo** (não invente um caminho que o fluxo não tem). Valores podem ser ilustrativos; a **estrutura** obedece ao fluxo rastreado. Se houver fixture/teste real à mão, prefira os dados de lá.
+Cada pergunta deve nomear IDs/termos deste projeto, apontar o artefato que a disparou,
+declarar jurisdição `artefato-aprovado` ou `humano`, explicar o impacto e definir o que a
+encerra. Pergunta filha registra `derivada-de`.
 
-## Saída · `docs/00-dominio/fluxos-negocio/<slug>.md`
+É proibido perguntar genericamente “qual o job?”, “quem sente?” ou “por que foi feito
+assim?”. Uma pergunta válida seria da forma: “Quando `BRANCH-004` leva o pedido de
+`PER-002` para revisão, `REGRA-003` exige esse bloqueio por risco financeiro ou por
+compliance? Quem ratifica esse porquê?”. Os IDs/termos usados devem existir no projeto.
 
-Publicável (Camada 0 · Domínio). Frontmatter Docusaurus + o esqueleto abaixo. **Toda frase de comportamento tem uma linha na tabela de trace.**
+Lente sem gatilho após inspeção fica `não acionada` com os IDs examinados. Não gere
+pergunta para preencher tabela e não use `N/A` como atalho.
+
+### 1.3 · Resolva em loop
+
+1. Responda primeiro usando apenas artefatos aprovados; não reabra código nem extrapole.
+2. Resposta que revela ambiguidade cria `PERG-NEG-###` filha.
+3. Apresente ao humano somente perguntas materiais que dependem de valor, regra,
+   significado ou autoridade, já acompanhadas da base e do impacto. Persista a fila e espere.
+4. Registre resposta verbatim no grill ou `aguardando-humano` com dono/impacto antes de continuar.
+5. Pergunta de jurisdição dos artefatos ainda aberta bloqueia a tradução; pendência
+   humana pode seguir marcada e visível.
+
+### 1.4 · Grave o grill
+
+Grave `.arquitetura/grills/negocio.<slug>.md`:
+
+```md
+# Grill de negócio — `FLUXO-<slug>`
+> Snapshot técnico: <snapshot> · Contexto-produto: <frescor>
+
+## Cobertura das lentes
+| Lente | Sinais concretos inspecionados | Estado | Perguntas |
+|---|---|---|---|
+| <lente> | <IDs/termos/artefatos> | acionada / não acionada com evidência | `PERG-NEG-###` / — |
+
+## Perguntas específicas
+| ID | Pergunta | Gatilho/base | Jurisdição | Por que importa | Critério de encerramento | Derivada de | Estado | Resposta/base |
+|---|---|---|---|---|---|---|---|---|
+| `PERG-NEG-001` | <pergunta com IDs/termos reais> | <base aprovada> | artefato-aprovado/humano | <impacto> | <prova/decisão> | — | aberta / resolvida / aguardando-humano / descartada | <resposta> |
+```
+
+Preserve IDs em reexecuções e acrescente novas perguntas no fim.
+
+## Fase 2 · Linguística
+
+- Voz ativa, ator nomeado e uma ideia por frase.
+- POV da persona: “a pessoa vê a solicitação em análise”, não “o controller responde”.
+- Traduza efeitos, não apenas palavras: idempotência vira o resultado “não duplica”.
+- Um exemplo concreto rotulado `Exemplo:`. Valores podem ser ilustrativos, mas persona,
+  sequência, branches e desfechos devem existir no fluxo.
+- Não suavize falhas. Incerteza explícita é melhor que uma jornada idealizada.
+
+## Saída
 
 ```md
 ---
 sidebar_position: <n>
-title: "Negócio: <nome legível>"
-description: "<uma linha, em linguagem de negócio>"
+title: "Negócio: <nome>"
+description: "<job/resultado em uma linha>"
 ---
 
-# <nome legível> — para o negócio
-> Companheiro de negócio do fluxo técnico: [<slug>](../../03-fluxos/<slug>.md). Escrito pra quem toca o produto.
+# <nome> — para o negócio
+> Companheiro do fluxo técnico: [<slug>](../../03-fluxos/<slug>.md).
+> Escopo: `FLUXO-<slug>` · EntryPoints cobertos: <ENTRY-IDs>.
 
 ## Em uma frase
-<o job que o fluxo resolve, em 1 frase>
+<job que o fluxo resolve>
 
-## Quem usa
-<persona(s) do contexto-produto + o que querem>
+## Quem usa e qual resultado busca
+<PER/JOB em linguagem natural, preservando o estado atribuído/inferido>
 
 ## Como funciona
-<o caminho feliz narrado em linguagem de gente, JÁ com o exemplo real embutido>
+<happy path + Exemplo:, cada afirmação comportamental associada a NEG-### no Trace>
 
 ## Quando dá errado
-<os error paths e a compensação em termos de negócio: o que o produto faz, quem sente>
+<branches, efeito percebido, recuperação/ação humana e limites>
 
-## Regras & porquês
-<os guards/limiares como política; cada porquê atribuído OU [inferido do código · a confirmar] + base>
+## Regras, porquês e trade-offs
+<REGRA/CON/ARC; todo porquê atribuído, inferido-a-confirmar ou pendente>
+
+## Limites e lacunas
+<fora de escopo, `PERG-NEG-###` humanas pendentes e DECISAO-PENDENTE>
 
 ## Trace
-<recolhível — a prova de que nada é ficção; cada afirmação → base no doc técnico>
-```
-
-O bloco **Trace** usa `<details>` do MDX pra recolher:
-
-```md
 <details>
-<summary>Trace — cada afirmação, sua base (a PO não precisa; o cético clica)</summary>
+<summary>Trace — cada afirmação e sua base</summary>
 
-| Afirmação (seção) | Tipo | Base | Estado |
-|---|---|---|---|
-| <frase resumida> | o quê / regra / porquê | <seção do doc técnico OU aresta do grafo OU quem atribuiu> | herdado-verificado / inferido-a-confirmar / atribuído |
+| ID | Afirmação/seção | Tipo | Base | Estado |
+|---|---|---|---|---|
+| `NEG-001` | <afirmação> | o quê / regra / porquê | `PASSO-###` / `BRANCH-###` / `FRONTEIRA-###` / `REGRA-###` / fonte humana | herdado-verificado / atribuído / inferido-a-confirmar / pendente |
 
 </details>
 ```
 
-## Critério de conclusão (checável e exaustivo)
+## Critério de conclusão
 
-- `docs/00-dominio/fluxos-negocio/<slug>.md` existe, com o esqueleto completo.
-- **Zero** nome de classe/arquivo/método/`arquivo:linha` na prosa (fora do bloco Trace recolhível).
-- **Toda** frase de comportamento (o quê) tem linha no Trace, com base no doc técnico e estado `herdado-verificado`.
-- **Todo** porquê é `atribuído` OU `[inferido do código · a confirmar]` **com base** — zero porquê sem origem.
-- O **exemplo** existe, está rotulado, e **nenhum** desfecho dele está fora do grafo.
-- As **5** perguntas da grill foram respondidas ou marcadas N/A (com motivo) nos passos de negócio.
-- O vocabulário é **só** o do glossário do `contexto-produto`.
+- Insumos técnicos estão aprovados e no mesmo snapshot.
+- `.arquitetura/grills/negocio.<slug>.md` existe e usa os mesmos artefatos da tradução.
+- Toda `PERG-NEG-###` cita gatilho real, jurisdição, impacto e critério de encerramento;
+  zero pergunta genérica copiada das lentes.
+- Perguntas de artefato estão resolvidas; humanas pendentes aparecem no doc.
+- As 6 lentes estão acionadas ou não acionadas com evidência.
+- Toda frase comportamental tem `NEG-###` no Trace, base existente e equivalência de
+  significado com o técnico.
+- Todo porquê/trade-off tem estado e base; nenhuma decisão foi inventada.
+- Exemplo cobre somente caminhos reais.
+- Termos vêm do glossário; código não vazou para a prosa.
+- Limites e lacunas estão explícitos.
 
 ## Handoff
 
-Imprima ao humano, literalmente:
-
-> Doc de negócio gravado em `docs/00-dominio/fluxos-negocio/<slug>.md`. Próximo passo: rode **`grill-negocio`** apontando para ele e para o doc técnico `docs/03-fluxos/<slug>.md`.
+> Grill específico gravado em `.arquitetura/grills/negocio.<slug>.md` e doc de negócio em `docs/00-dominio/fluxos-negocio/<slug>.md`, com <n> pendências humanas. Próximo passo: rode **`grill-negocio`** apontando para o grill, o doc e os artefatos técnicos do mesmo fluxo.

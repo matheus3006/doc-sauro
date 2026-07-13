@@ -1,129 +1,278 @@
 # Prompt · `documentar-fluxo`
 
-> A joia da trilha. Portável (Amazon Q / Copilot / Kiro), **standalone**, sem subagente, sem parser. Roda **um por fluxo crítico**, depois do `mapear-estrutura`.
+> A joia do track técnico. Portável (Amazon Q / Copilot / Kiro), **standalone**,
+> sem subagente, sem parser. Roda uma vez por fluxo crítico, depois de
+> `mapear-estrutura`.
 
-Você **rastreia UM fluxo ponta-a-ponta lendo o corpo do código** e produz o doc de fluxo `.md` (prosa + `sequenceDiagram`). Este passo é *trace-driven*, não *template-driven*: você **segue a execução real**, não preenche campos. O template é o inimigo — ele convida à passada rasa; o rastreamento força a profundidade.
+Você rastreia **UM** fluxo ponta-a-ponta abrindo o corpo do código. Produz um ledger
+técnico interno e um documento publicável. O trabalho é *trace-driven*: segue execução,
+branches e fronteiras reais; o esqueleto de saída não autoriza preencher lacunas.
 
-> **Este prompt encoda dois comportamentos** que no Claude seriam skills (`/grilling`, `/domain-modeling`) e que **aqui não existem** — então estão escritos abaixo, não invocados:
-> 1. **Leitura forçada (grill):** abrir o corpo, seguir cada chamada até a folha, nunca aceitar "provavelmente faz X".
-> 2. **Registro verbatim do domínio:** capturar o termo do domínio como ele aparece, sem parafrasear.
+## Contrato de execução
 
-## Princípio-norte (inegociável)
+- **Entrada humana obrigatória:** nome do fluxo + `ENTRY-###` ou entrypoint inequívoco.
+- **Pode escrever:** `.arquitetura/grills/tecnico.<slug>.md`, `.arquitetura/mapa/` e
+  `docs/03-fluxos/<slug>.md`.
+- **Não pode:** alterar código, ampliar para outro fluxo, propor arquitetura como se
+  estivesse vigente ou transformar `[inferido]` em fato.
+- **Pré-condições:** contexto e mapa existem; entrypoint resolve para uma declaração;
+  o fluxo cabe em uma intenção verificável. Ausência/ambiguidade → `BLOQUEADO`, com a
+  pergunta exata ao humano.
+- **Frescor:** compare commit e estado da árvore ao contexto/mapa. Em árvore limpa, grave
+  o commit. Em árvore alterada/sem VCS, grave fingerprint de conteúdo de **cada arquivo
+  citado** (algoritmo + digest). Se não conseguir criar snapshot verificável, bloqueie o
+  gate/publicação. Drift marca nós `stale` e exige nova leitura.
+- **Checkpoint humano:** descoberta que rompa `ARC-###`, contrato externo, compliance ou
+  limite do fluxo vira `DECISAO-PENDENTE-###`; registre e siga apenas o caminho vigente.
 
-> O mapa e o depoimento humano são **hipóteses** — nunca citados. A **única** fonte citável sobre o que o código FAZ é o próprio código, como **`arquivo:linha`**. Toda frase de comportamento no doc carrega `arquivo:linha`. Se você não abriu o corpo, você **não sabe** — está `[inferido]`.
+## Princípio-norte e jurisdição
 
-## Jurisdição (modelo de verdade)
+> Mapa e depoimento são hipóteses. A única fonte citável sobre o que o código faz é o
+> próprio código (`arquivo:linha`). Se o corpo não foi aberto, o comportamento não é
+> conhecido.
 
-- **Fato-de-código** (o que o código faz) → **código manda**; cite `arquivo:linha`.
-- **Porquê / restrição** → **humano manda**, e entra **atribuído** (verbatim + quem + quando), nunca como fato objetivo.
-- **Verificação independe da fonte:** afirmação sobre o que o código faz — venha do mapa OU do humano — é checada contra o código antes de entrar. Humano diz "retorna string", código diz `int` → humano **refutado** com `arquivo:linha`.
-- **Contradição = achado:** humano contradiz o código → não resolva no silêncio. Vira **divergência** registrada (**registra-e-segue**: o código vence o fato; a doc não trava; a divergência vira registro de primeira classe).
+- Código decide comportamento; humano decide propósito, restrição e trade-off, atribuído.
+- Contradição humano × código é achado. Código vence o fato; a divergência não some.
+- Compromissos `ARC-###` e restrições `CON-###` são preservados. Melhoria incompatível
+  não é aplicada à narrativa atual.
+- IDs são contratos persistentes: `FLUXO-<slug>`, `PASSO-###`, `ARESTA-###`,
+  `BRANCH-###` e `FRONTEIRA-###`. Não reutilize um ID para outro significado.
 
-## Insumos
+## Fase 1 · Delimite o contrato do fluxo
 
-- `.arquitetura/contexto.md` (stack, estrutura, domínio elicitado).
-- `.arquitetura/mapa/` (semente — para localizar entrypoints rápido).
-- **O fluxo + entrypoint** que o humano te deu (ex.: `"autorização de pagamento" — POST /payments`). Derive um `slug` kebab-case (ex.: `autorizacao-de-pagamento`).
+Antes de rastrear, escreva no ledger:
 
-## O laço de rastreamento (o coração)
+- **Intenção:** resultado observável que encerra este fluxo.
+- **Início:** `ENTRY-###` + declaração confirmada.
+- **Dentro do escopo:** branches disparados a partir desse início até retorno ou
+  fronteira terminal.
+- **Fora do escopo:** fluxos seguintes/anteriores, utilitários triviais e motivos.
+- **Pré-condições e pós-condições:** o que precisa ser verdadeiro antes/depois, com
+  evidência ou `[PENDENTE]` atribuído.
 
-Comece no **entrypoint** do fluxo (localize pelo mapa; confirme abrindo o arquivo). A partir dele:
+Se não houver um fim distinguível, não escolha arbitrariamente: bloqueie e peça ao
+humano o resultado que define a fronteira.
 
-1. **Abra o corpo.** Leia a unidade inteira, não a assinatura. Cite onde o fluxo entra: `arquivo:linha`.
-2. **Siga cada chamada que faz parte do fluxo INTO o alvo.** Não pare na chamada — abra o corpo do **callee** e continue. Cada salto vira uma **aresta** do **grafo rastreado**: `<caller> arquivo:linha → <callee> arquivo:linha`.
-3. **Pare um ramo** só quando chegar a: (a) uma **fronteira externa** (rede/HTTP, banco, fila, filesystem, processo/container, relógio), (b) um **retorno** ao chamador, ou (c) uma chamada que você **decide** não seguir — e aí **marque `fora-de-escopo`** com motivo. `fora-de-escopo` é uma **decisão registrada**, não uma omissão.
-4. **Promova as afirmações:** tudo que você confirmou abrindo o corpo vira **`[verificado: arquivo:linha]`**. O que continua fechado fica **`[inferido]`** — e `[inferido]` **não pode** virar frase de comportamento no doc; ou você abre, ou marca `fora-de-escopo`.
-5. **Capture o domínio verbatim:** ao cruzar um termo do domínio (estado, evento, entidade, invariante), registre-o como aparece no código/comentário/depoimento. Não invente sinônimo.
+## Fase 2 · Laço de rastreamento
 
-> **Lazy:** siga só a fatia deste fluxo. Não mapeie o repo inteiro. Utilitário genérico fora do caminho do fluxo (logging, mapper trivial) → `fora-de-escopo`, com motivo curto.
+Comece no entrypoint e repita até todos os ramos terminarem:
 
-## Interrogatório do 20% difícil (por nó — o que a passada rasa pula)
+1. Abra o corpo da unidade inteira. Crie `PASSO-###` para cada ação comportamental
+   distinguível e cite o intervalo mínimo `arquivo:linha` que a sustenta.
+2. Siga cada chamada do fluxo para o callee. Cada salto recebe `ARESTA-###` com caller,
+   callee, branch e evidência nos dois lados.
+3. Cada condição que muda o caminho recebe `BRANCH-###`: condição, resultado verdadeiro,
+   resultado falso e evidência. Branch sem dois resultados explicados fica incompleto.
+4. Ao chegar a rede, banco, fila, filesystem, processo, relógio ou sistema/equipe externa,
+   crie `FRONTEIRA-###`. Registre contrato observável, direção, dependência, falha e
+   evidência. Não trate interface local como fim se a implementação acessível mostra a
+   fronteira real.
+5. Pare um ramo apenas em retorno, fronteira terminal ou `fora-de-escopo` explícito. Toda
+   chamada não seguida permanece no ledger com motivo; nada some por conveniência.
+6. Atualize o mapa apenas para nós tocados. `verificado` significa corpo lido neste hash;
+   `corrigido` significa que a hipótese anterior foi refutada e substituída com evidência.
 
-O template preenche o happy path e cala o resto. Em **cada** nó do rastreamento, **pergunte ativamente** (e responda no doc, com `arquivo:linha`, ou marque N/A com motivo):
+Leitura é lazy: não mapeie o repo inteiro. Logging/mapper trivial pode ficar fora de
+escopo, mas autorização, consistência, persistência e tratamento de erro não são
+“utilitários” só porque vivem em helpers.
 
-- **Error path** — o que acontece quando falha aqui? exceção, retorno de erro, status? pra onde vai?
-- **Chamada externa** — este nó fala com rede/banco/fila/fs/processo? qual? (dependência externa = risco; muitas ficam escondidas atrás de uma interface.)
-- **Transição de estado** — muda status de alguma entidade? de quê pra quê? sob qual guarda?
-- **Idempotência** — chamar duas vezes causa efeito duplo? há lock/chave/guarda que protege?
-- **Timeout / retry** — há prazo? re-tentativa? backoff? quem re-dispara?
-- **Compensação** — se um passo depois falha, o que desfaz/estanca este? (drena, cancela, reverte?)
+## Fase 3 · Gere o grill específico deste fluxo
 
-Esses seis são o gatilho de profundidade. Um nó com todos "N/A" é suspeito — provavelmente você não abriu fundo o bastante.
+As nove dimensões abaixo são **lentes de descoberta**, não perguntas prontas:
 
-## Saídas
+`domínio/contrato` · `erro/propagação` · `fronteira externa` · `estado/consistência` ·
+`idempotência/concorrência` · `timeout/retry` · `compensação/recuperação` ·
+`observabilidade/ownership` · `segurança/dados/compliance`.
 
-### 1 · Grafo rastreado → `.arquitetura/mapa/fluxos/<slug>.grafo.md`
+### 3.1 · Encontre gatilhos reais
 
-Interno (é insumo do gate, não vai pro site). Liste **toda** aresta na ordem do rastreamento:
+Cruze cada lente com os artefatos deste projeto: `PASSO`, `BRANCH`, `ARESTA`,
+`FRONTEIRA`, nomes/literais do código, `ARC`, `CON`, termos/invariantes do domínio e
+lacunas do contexto. Um gatilho pode ser uma evidência encontrada ou uma ausência
+material depois de inspecionar o lugar onde ela deveria existir.
+
+Exemplos de gatilho: branch que traduz uma exceção; mudança de estado fora de transação;
+SDK externo sem timeout visível; retry ao lado de operação não idempotente; `CON-###`
+sem mecanismo observável; termo de domínio usado com dois significados.
+
+### 3.2 · Gere `PERG-TEC-###`
+
+Cada pergunta deve:
+
+- nomear pelo menos um elemento concreto do projeto (`PASSO/BRANCH/FRONTEIRA`, símbolo,
+  literal, `ARC/CON/TERMO`) e apontar a evidência que a disparou;
+- investigar uma incerteza específica, nunca repetir a lente de forma genérica;
+- declarar jurisdição `código` ou `humano`;
+- explicar por que a resposta muda a documentação, o risco ou o escopo;
+- definir a evidência/decisão necessária para encerrá-la;
+- registrar `derivada-de: PERG-...` quando nascer de uma resposta anterior.
+
+É proibido gerar perguntas como “há retry?”, “existe compensação?” ou “quem usa?” sem
+referência concreta ao projeto. Se uma lente não encontra sinal após inspeção, registre
+`não acionada` + IDs/arquivos inspecionados; não gere pergunta artificial nem `N/A` em
+massa.
+
+### 3.3 · Resolva em loop
+
+1. Resolva primeiro toda pergunta de jurisdição `código`, abrindo o corpo necessário.
+2. Cada resposta pode criar follow-up específico; acrescente novo ID no fim da fila.
+3. Só depois apresente ao humano as perguntas materiais ainda abertas de jurisdição
+   humana — com contexto, evidência já encontrada e impacto. Persista a fila e **espere**.
+4. Registre a resposta verbatim e atualize o grill antes de continuar. Se ela abrir nova
+   incerteza, gere pergunta filha.
+5. Pare quando cada pergunta estiver `resolvida`, `aguardando-humano` explicitamente ou
+   `descartada` porque o gatilho foi refutado com evidência.
+
+Pergunta de código ainda aberta bloqueia a doc. Pergunta humana pode seguir como
+`[PENDENTE]` se estiver visível na doc e tiver dono/impacto; nunca responda pelo humano.
+
+## Saída 1 · Grill técnico dinâmico
+
+Grave `.arquitetura/grills/tecnico.<slug>.md`:
 
 ```md
-# Grafo rastreado — <fluxo>
-> Interno. Insumo do gate `grill-doc`. Frescor: <data-hora> · <hash>
-> Entrypoint: `<arquivo:linha>`
+# Grill técnico — `FLUXO-<slug>`
+> Snapshot: <commit:hash|manifest:digest> · Gerado a partir deste projeto
 
-| # | Caller (arquivo:linha) | Callee (arquivo:linha) | Papel do salto | Fronteira? | Estado da aresta |
-|---|---|---|---|---|---|
-| 1 | `<a:linha>` | `<b:linha>` | <o que este salto faz> | externa/interna | verificado / fora-de-escopo |
-...
+## Cobertura das lentes
+| Lente | Sinais concretos inspecionados | Estado | Perguntas geradas |
+|---|---|---|---|
+| <lente> | <IDs/símbolos/arquivos> | acionada / não acionada com evidência | `PERG-TEC-###` / — |
+
+## Perguntas específicas
+| ID | Pergunta | Gatilho/evidência | Jurisdição | Por que importa | Critério de encerramento | Derivada de | Estado | Resposta/evidência |
+|---|---|---|---|---|---|---|---|---|
+| `PERG-TEC-001` | <pergunta que nomeia este projeto> | <ID/símbolo + arquivo:linha> | código/humano | <impacto> | <prova/decisão esperada> | — | aberta / resolvida / aguardando-humano / descartada | <resposta + fonte> |
 ```
 
-### 2 · Doc de fluxo → `docs/03-fluxos/<slug>.md`
+IDs são estáveis: reexecução preserva perguntas existentes e adiciona novas no fim.
 
-Publicável. Frontmatter Docusaurus + prosa + `sequenceDiagram`. **Toda frase de comportamento carrega `arquivo:linha`.**
+## Saída 2 · Ledger do fluxo
 
-```md
+Grave `.arquitetura/mapa/fluxos/<slug>.grafo.md`:
+
+````md
+# Grafo rastreado — <fluxo>
+> ID: `FLUXO-<slug>` · Interno · Snapshot: `commit:<hash>` / `manifest:<digest>` · Frescor: <data-hora>
+> Início: `ENTRY-###` — `<arquivo:linha>`
+
+## Snapshot das fontes
+| Arquivo citado | Commit limpo ou algoritmo:digest do conteúdo |
+|---|---|
+| `<path>` | `commit:<hash>` / `sha256:<digest>` / `<algoritmo>:<digest>` |
+
+> Em árvore alterada/sem VCS, `manifest:<digest>` identifica a lista ordenada
+> `arquivo + algoritmo + digest`; etapas posteriores carregam esse Snapshot-ID.
+
+## Contrato e escopo
+- Intenção: <resultado observável>
+- Pré-condições: <com evidência/pendência>
+- Pós-condições: <com evidência/pendência>
+- Dentro: <limite> · Fora: <limite + motivo>
+
+## Passos
+| ID | Comportamento | Evidência | Branch | Estado |
+|---|---|---|---|---|
+| `PASSO-001` | <ação> | `<arquivo:linha>` | `BRANCH-###`/principal | verificado |
+
+## Branches
+| ID | Condição + evidência | Se verdadeiro | Se falso |
+|---|---|---|---|
+| `BRANCH-001` | <condição> — `<arquivo:linha>` | <PASSO/retorno> | <PASSO/retorno> |
+
+## Arestas
+| ID | Caller | Callee/fronteira | Papel | Branch | Estado |
+|---|---|---|---|---|---|
+| `ARESTA-001` | `<a:linha>` | `<b:linha>` / `FRONTEIRA-###` | <salto> | <id> | verificado / fora-de-escopo |
+
+## Fronteiras
+| ID | Dependência/direção | Contrato + evidência | Falha/timeout/retry | Ownership/observabilidade | Restrições |
+|---|---|---|---|---|---|
+| `FRONTEIRA-001` | saída → <sistema> | <contrato> `<arquivo:linha>` | <efeito> | <conhecido ou PENDENTE> | `CON-###`/N/A |
+
+## Questões arquiteturais relacionadas
+| Nó do trace | Perguntas do grill | Estado |
+|---|---|---|
+| <PASSO/BRANCH/FRONTEIRA> | `PERG-TEC-###` | resolvida / aguardando-humano |
+
+## Fora de escopo
+- `ARESTA-###` — <motivo>
+
+## Divergências e decisões pendentes
+- <achado × `ARC-###`/`CON-###`/humano; ou "nenhuma">
+````
+
+## Saída 3 · Doc técnico publicável
+
+Grave `docs/03-fluxos/<slug>.md`. Toda frase de comportamento termina com o ID do passo
+e evidência: `[PASSO-### · arquivo:linha]`. Esse formato separa identidade da afirmação e
+permite ao gate validar sem heurística textual.
+
+````md
 ---
 sidebar_position: <n>
-title: "Fluxo: <nome legível>"
-description: "<uma linha>"
+title: "Fluxo: <nome>"
+description: "<resultado observável em uma linha>"
 ---
 
-# Fluxo: <nome legível>
+# Fluxo: <nome>
 
-## Gatilho
-<quem/o quê dispara> — entrypoint `arquivo:linha`.
+## Contrato e escopo
+<intenção, gatilho/ENTRY, precondições, pós-condições e limites>
 
 ## Happy path
-<passo a passo seguindo o grafo, cada passo com `arquivo:linha`>
+<passos em ordem, cada um com [PASSO-### · arquivo:linha]>
 
-## Error paths
-<um subtítulo por caminho de erro real encontrado, com `arquivo:linha`>
+## Branches e error paths
+<cada BRANCH; erro, propagação e resultado observável>
 
-## Chamadas externas
-<cada fronteira externa cruzada: qual, onde `arquivo:linha`, o que acontece se ela falhar/demorar>
+## Fronteiras e dependências
+<cada FRONTEIRA; contrato, direção, falha e risco>
 
-## Transições de estado · idempotência · timeout/retry · compensação
-<o que o interrogatório do 20% achou, com `arquivo:linha`; N/A explícito onde não se aplica>
+## Estado e consistência
+<transições, transações, idempotência e concorrência>
 
-## Divergências (achados)
-<humano × código, atribuído + `arquivo:linha` do que o código realmente faz; ou "nenhuma">
+## Resiliência e recuperação
+<timeout, retry, compensação, reconciliação e ação humana>
+
+## Operação, segurança e compliance
+<observabilidade/ownership e CON-### aplicáveis; pendências explícitas>
+
+## Divergências e decisões pendentes
+<achados e `PERG-TEC-###` humanas pendentes com dono/impacto, sem mudar arquitetura no silêncio>
 
 ## Diagrama
 ```mermaid
 sequenceDiagram
   participant ...
-  ...
 ```
-```
+````
 
-**O `sequenceDiagram` é fiel ao grafo rastreado:** cada mensagem = uma aresta; error paths viram `alt`/`opt`. Nada de seta que não exista no grafo. (Subset seguro: só `sequenceDiagram`/`flowchart`, labels entre aspas, IDs alfanuméricos, sem `<>`/parênteses/HTML dentro de nó — o `grill-mermaid` confere.)
+O diagrama é resumo, não nova fonte: cada mensagem corresponde a `ARESTA-###`; branches
+e falhas usam `alt`/`opt`; participantes externos correspondem a `FRONTEIRA-###`.
 
-### 3 · Atualize o mapa
+## Saída 4 · Atualize o mapa
 
-Promova os nós tocados para `verificado`/`corrigido`, e na tabela de cobertura do `_indice.md` marque este fluxo na coluna "Fluxos que cobriram" dos módulos que ele atravessou.
+- Associe `FLUXO-<slug>` ao(s) `ENTRY-###` de início.
+- Marque módulos tocados e nós promovidos, com snapshot/frescor.
+- Atualize o entrypoint para `confirmado` e associe `FLUXO`, doc e grafo. Gates são
+  anexados a essa associação; nunca “aprovam o entrypoint inteiro”.
 
-## Critério de conclusão (checável e exaustivo)
+## Critério de conclusão
 
-- `docs/03-fluxos/<slug>.md` e `.arquitetura/mapa/fluxos/<slug>.grafo.md` existem.
-- **Toda** chamada que você seguiu é uma **aresta** no grafo, com caller→callee em `arquivo:linha`.
-- **Toda** frase de comportamento no doc é `[verificado: arquivo:linha]` — **zero** `[inferido]` virou afirmação.
-- **Toda** chamada não seguida está marcada `fora-de-escopo` com motivo (nem um salto some no silêncio).
-- Em **cada** nó, os **6** do interrogatório foram respondidos ou marcados N/A com motivo.
-- Divergências humano×código registradas como achados (ou "nenhuma").
-- O `sequenceDiagram` não tem nenhuma seta fora do grafo rastreado.
+- Grill, ledger e doc usam o mesmo snapshot.
+- Toda `PERG-TEC-###` nomeia um sinal real do projeto, possui gatilho, jurisdição,
+  impacto e critério de encerramento; zero pergunta genérica copiada de lente.
+- Perguntas de código estão resolvidas; pendências humanas aparecem na doc com dono/impacto.
+- As 9 lentes têm cobertura registrada como acionada ou não acionada com evidência.
+- Todo comportamento do doc usa `PASSO-###` válido + `arquivo:linha` que o sustenta.
+- Todo salto/branch/fronteira tem ID; chamadas não seguidas estão fora de escopo.
+- Diagrama não inventa aresta/participante.
+- Mapa relaciona `FLUXO` e `ENTRY` sem confundi-los.
+- Descobertas que mudariam compromissos estão como decisão pendente, não como fato.
 
 ## Handoff
 
-Imprima ao humano, literalmente:
+Imprima literalmente:
 
-> Doc gravado em `docs/03-fluxos/<slug>.md` e grafo em `.arquitetura/mapa/fluxos/<slug>.grafo.md`. Próximo passo: rode **`grill-doc`** apontando para esses dois arquivos.
+> Fluxo `FLUXO-<slug>` gravado com grill específico em `.arquitetura/grills/tecnico.<slug>.md`, doc e ledger, associado a <ENTRY-IDs>. Pendências humanas: <n>. Próximo passo: rode **`grill-doc`** apontando para os três artefatos.

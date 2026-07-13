@@ -1,5 +1,9 @@
 # Evidência da tese — piloto Wakeup → Run → Settle
 
+> **Escopo desta evidência:** execução do contrato original da trilha. Não constitui
+> aprovação dos contratos arquiteturais atuais (`ENTRY/FLUXO/PASSO`, gates persistentes,
+> citação semântica e cobertura `C/E`). Uma nova rodada do piloto é necessária.
+
 > Tese (DESIGN §1): a doc rasa sai rasa por **profundidade** (não segue a execução) e **completude**
 > (omite o 20% difícil). O slice ataca os dois: **mapa barato + leitura forçada (`documentar-fluxo`) +
 > gates (`grill-doc`/`grill-mermaid`)**. Aqui está o que o rastreamento pegou e a passada rasa/template

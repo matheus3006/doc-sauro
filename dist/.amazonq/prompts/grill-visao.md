@@ -1,76 +1,111 @@
 # Prompt · `grill-visao`
 
-> Gate da **Visão de Produto** (Camada 0). Portável (Amazon Q / Copilot / Kiro), **standalone**, sem subagente, sem parser. Roda depois do `documentar-visao`, apontando pra visão, pros docs de negócio que ela liga, e pro índice do mapa.
+> Gate da visão de produto. Portável (Amazon Q / Copilot / Kiro), **standalone**,
+> sem subagente e sem parser. Roda depois de `documentar-visao`.
 
-Você **audita a visão de produto** em quatro frentes: **âncora/honestidade** (bloqueante), **zero jargão** (bloqueante), **mapa fiel** (bloqueante) e **legibilidade** (consultiva). Você não reescreve — emite um **veredito** com a lista exata do que consertar. A diferença pro `grill-negocio`: aqui não há um exemplo contra um grafo; a fidelidade é do **mapa** (todo fluxo linkado existe e diz o que o doc dele diz) e da **cobertura** (a visão não finge cobrir o app inteiro).
+Você audita a síntese, a cadeia de confiança e a honestidade de cobertura. Não reescreve
+a visão. Grava `.arquitetura/gates/grill-visao.md`.
 
-## Insumos
+## Pré-condições
 
-- A visão: `docs/00-dominio/visao-de-produto.md` (com o bloco Trace).
-- Os docs de negócio que ela liga: `docs/00-dominio/fluxos-negocio/*.md` (cada um com seu "Em uma frase").
-- `.arquitetura/mapa/_indice.md` (a tabela de cobertura — quantos fluxos/entrypoints o mapa conhece).
-- `.arquitetura/contexto-produto.md` (o glossário — a lista de vocabulário permitido).
+- Grill `.arquitetura/grills/visao.md`, visão, contexto-produto, `_indice.md`, docs nela
+  ligados e respectivos gates existem.
+- Se não houver fluxo de negócio aprovado, resultado `BLOQUEADO-PRECONDICAO`.
+- Se o mapa ou um doc mudou desde a geração, resultado `STALE`; recalcule antes de auditar.
 
-## Gate 1 · Âncora & honestidade — **BLOQUEANTE**
+## Gate 0 · Identidade e cadeia — BLOQUEANTE
 
-A tese: **nada na visão é ficção — toda afirmação é rastreável.** Varra o doc:
+Para cada `PERG-VISAO-###` e `VISAO-###`, confira base e estado. Toda pergunta precisa
+nomear sinais cross-flow reais, declarar jurisdição/impacto/critério e apontar o gatilho.
+Pergunta que apenas repete uma lente recebe `PERGUNTA-GENERICA`; sem base,
+`PERGUNTA-SEM-GATILHO`; jurisdição `artefato-aprovado` aberta,
+`PERGUNTA-ARTEFATO-ABERTA`. Pendência humana só passa se limitar a síntese visivelmente.
 
-- Toda **linha do mapa** (cada fluxo documentado) tem linha no **Trace** apontando um `docs/00-dominio/fluxos-negocio/<slug>.md` que **existe de verdade**, estado `herdado-verificado`? Sem linha, ou doc inexistente → **SEM-ÂNCORA** (reprova).
-- O **"O que é"** (síntese) está `[inferido do código · a confirmar]` **com base** (conjunto de fluxos + propósito)? A **cobertura** (N de ~M) idem, base no `_indice.md`? Uma síntese ou cobertura afirmada como fato, sem marca → **FICÇÃO** (reprova).
-- **Personas / jobs** entram com a marcação herdada do `contexto-produto` (atribuído ou inferido-com-base), nunca como fato novo? Senão → **FICÇÃO**.
-- Liste **todas as inferências a confirmar** num bloco à parte — é a fila do dono de produto. (Registra-e-segue: não reprova por *ser* inferência; reprova por inferência **sem base** ou fato inventado.)
+Todo fluxo linkado precisa de:
 
-## Gate 2 · Zero jargão na prosa — **BLOQUEANTE**
+- doc existente e link relativo resolvível;
+- `grill-negocio.<slug>.md` aprovado;
+- mesmo `FLUXO/ENTRY/snapshot` dos artefatos técnicos;
+- linha de Trace apontando fonte real.
 
-A PO não pode topar com código. Fora do bloco Trace (recolhível), a prosa tem algum **nome de classe/arquivo/método**, `arquivo:linha`, ou **termo técnico cru** (`idempotente`, `mutex`, `PENDING_REVIEW`, `endpoint`, `lock`, `thread`)? Cada ocorrência → **JARGÃO** (reprova), com a frase e a sugestão em linguagem de gente. (Os pares `técnico: <nome>` na seção *Vocabulário* são a ponte permitida — não são jargão cru, como no glossário do `grill-negocio`.)
+Falhas: `SEM-ANCORA`, `GATE-AUSENTE`, `LINK-QUEBRADO`, `HASH-DIVERGENTE`.
 
-## Gate 3 · Mapa fiel — **BLOQUEANTE**
+## Gate 1 · Honestidade de síntese — BLOQUEANTE
 
-O mapa liga a verdade certa e não engana sobre cobertura:
+- “O que é” está inferido-a-confirmar e sua base lista os fluxos usados.
+- Persona/job/regra preserva ID e estado do contexto-produto.
+- Fronteira compartilhada é comprovada por pelo menos dois ledgers; sem isso, é
+  `GENERALIZACAO-INDEVIDA`.
+- Nenhuma narrativa liga fluxos sem contrato/aresta que prove a relação.
+- Inferências, limitações e decisões humanas estão visíveis.
 
-- Todo fluxo do mapa **linka um doc que existe** e o **link resolve** (caminho relativo certo)? Link quebrado → **MAPA-INFIEL** (reprova).
-- O **one-liner** de cada fluxo é **idêntico** ao "Em uma frase" do doc de negócio linkado (citado, não reescrito)? Divergiu → **ONE-LINER-DRIFT** (reprova) — reescrever desancora do que o `grill-negocio` aprovou.
-- Existe algum fluxo listado como documentado que **não tem doc**, ou algum caminho **cross-flow inventado** (uma história que atravessa fluxos que os docs não conectam)? → **MAPA-INFIEL** (reprova).
-- A **nota de cobertura** bate: `N` = nº de docs de negócio que existem de fato; `~M` = o que o `_indice.md` conhece; e o que falta está **listado** (não silenciado)? Cobertura omitida ou número errado → **COBERTURA-FALSA** (reprova).
+Falhas: `FICCAO`, `INFERENCIA-PROMOVIDA`, `CROSS-FLOW-INVENTADO`,
+`GENERALIZACAO-INDEVIDA`, `LACUNA-OCULTA`.
 
-## Gate 4 · Legibilidade — **CONSULTIVA**
+## Gate 2 · Mapa e cobertura — BLOQUEANTE
 
-Marque cada item `ok` / `fraco` / `N/A`:
+Recalcule a partir dos arquivos, sem confiar nos números escritos:
 
-- [ ] **O que é** diz o produto no todo sem rodeio.
-- [ ] **POV da PO** (não da máquina / não do código).
-- [ ] **Voz ativa**, ator nomeado, uma ideia por frase.
-- [ ] **Vocabulário** só do glossário, consistente.
-- [ ] **Esqueleto completo** (*O que é · Pra quem é · Vocabulário · Os fluxos principais + Cobertura · Trace*).
+- `N` = docs com gate de negócio aprovado;
+- `E` = entrypoints concretos `ENTRY-###`; `ENTRY-DINAMICO-###` fica fora do denominador
+  e aparece nas limitações porque sua cardinalidade é desconhecida;
+- `C` = `ENTRY-###` associados a ao menos um dos `N` fluxos aprovados.
 
-Consultivo = **não reprova**, mas todo `fraco` vira **recomendação**.
+Confirme também:
 
-## Veredito
+- cada one-liner é byte a byte igual ao `## Em uma frase` de origem;
+- entrypoints em revisão/não cobertos aparecem na fila correta;
+- nenhum módulo, doc ou entrypoint foi contado como se fosse “fluxo total”.
+
+Falhas: `ONE-LINER-DRIFT`, `COBERTURA-FALSA`, `UNIDADE-MISTURADA`,
+`ENTRYPOINT-SEM-MAPEAMENTO`.
+
+## Gate 3 · Domínio e linguagem — BLOQUEANTE
+
+- Zero código/jargão cru fora do Trace e de pares aprovados no Vocabulário.
+- Termos preservam o glossário; `ARC/CON` não viram benefício sem fonte.
+- “Visão completa/app inteiro” não aparece quando `C/E`, limitações ou lacunas mostram
+  cobertura parcial.
+
+Falhas: `JARGAO`, `DRIFT-DE-DOMINIO`, `COMPROMISSO-TRAIDO`, `COMPLETUDE-FINGIDA`.
+
+## Gate 4 · Legibilidade — CONSULTIVO
+
+Marque `ok/fraco/N/A`: síntese; personas/jobs; vocabulário/regras; mapa de fluxos;
+fronteiras/riscos; cobertura/fila; decisões/lacunas; voz ativa e clareza.
+
+## Veredito persistente
 
 ```md
 # grill-visao — visao-de-produto
-## Gate 1 · Âncora & honestidade (bloqueante): PASSA / REPROVA
-SEM-ÂNCORA: <n> · FICÇÃO: <n>  — Inferências a confirmar: <lista>
-## Gate 2 · Zero jargão (bloqueante): PASSA / REPROVA
-JARGÃO: <n>  — <frase + sugestão>
-## Gate 3 · Mapa fiel (bloqueante): PASSA / REPROVA
-MAPA-INFIEL: <n> · ONE-LINER-DRIFT: <n> · COBERTURA-FALSA: <n>
-## Gate 4 · Legibilidade (consultiva)
-<checklist>  — recomendações: <lista>
-## Resultado: APROVADO  (só se os 3 bloqueantes PASSAM)
-        ou   BLOQUEADO  → conserte: <lista exata>
+> Auditada em <data-hora> contra mapa <snapshot/frescor>
+
+## Gate 0 · Cadeia: PASSA/REPROVA
+PERGUNTA-GENERICA: <n> · PERGUNTA-SEM-GATILHO: <n> · PERGUNTA-ARTEFATO-ABERTA: <n>
+## Gate 1 · Síntese: PASSA/REPROVA
+## Gate 2 · Mapa/cobertura: PASSA/REPROVA
+- Recalculado: N=<n> · C/E=<c>/<e> · limitações=<lista>
+## Gate 3 · Domínio/linguagem: PASSA/REPROVA
+<violações com VISAO-ID, fonte e correção>
+## Gate 4 · Legibilidade consultiva
+<checklist>
+## Inferências, decisões e lacunas humanas
+<fila com dono/impacto>
+## Resultado: APROVADO / BLOQUEADO / STALE / BLOQUEADO-PRECONDICAO
+## Correções necessárias
+<lista exata por ID>
 ```
 
-## Critério de conclusão (checável)
+## Critério de conclusão
 
-- **Toda** linha do mapa classificada (ancorada / SEM-ÂNCORA), e o doc linkado conferido que existe.
-- **Todo** one-liner comparado ao "Em uma frase" da fonte; **toda** síntese e a cobertura classificadas (inferido-com-base / FICÇÃO).
-- **Toda** ocorrência de jargão listada.
-- Cobertura conferida contra o `_indice.md` (N e ~M).
-- Os **5** itens de legibilidade marcados.
-- Veredito final coerente com os **3** gates bloqueantes.
+- Todo `PERG-VISAO-###`, `VISAO-###`, link, one-liner, gate de origem e estado foi conferido.
+- O grill não contém pergunta genérica/sem gatilho nem pergunta de artefato aberta.
+- `N` e `C/E` foram recalculados; dinâmicos e limitações ficaram fora do denominador.
+- Toda síntese, generalização e relação cross-flow foi classificada.
+- O arquivo persistente existe e o resultado respeita os gates bloqueantes/frescor.
 
 ## Handoff
 
-- **APROVADO** → imprima: *"grill-visao aprovado. A visão `docs/00-dominio/visao-de-produto.md` está ancorada, sem jargão e fiel ao mapa (todo fluxo linkado existe e a cobertura é honesta) — pronta pra PO / publicação. Confirme as inferências marcadas quando um dono de produto puder."*
-- **BLOQUEADO** → imprima: *"grill-visao bloqueado por <n> âncora / <n> jargão / <n> mapa. Volte ao **`documentar-visao`** e cubra a lista acima."*
+- **APROVADO:** `grill-visao aprovado e gravado em .arquitetura/gates/grill-visao.md. A visão está apta à revisão humana/publicação dentro da cobertura declarada.`
+- **BLOQUEADO:** `Volte ao documentar-visao e corrija a lista por VISAO-ID.`
+- **STALE/PRECONDICAO:** `Atualize mapa/docs/gates de origem antes de regenerar e auditar a visão.`

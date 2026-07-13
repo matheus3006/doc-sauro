@@ -1,83 +1,133 @@
 ---
-description: 'Você audita um doc de fluxo em três frentes: completude estrutural (bloqueante), disciplina de citação (bloqueante) e rubrica de fluxo (consultiva).'
+description: 'Você audita um doc contra seu ledger e contra o código citado.'
 agent: 'agent'
 ---
 
 # Prompt · `grill-doc`
 
-> Gate de qualidade da trilha. Portável (Amazon Q / Copilot / Kiro), **standalone**, sem subagente, sem parser. Roda depois do `documentar-fluxo`, apontando para o doc e seu grafo.
+> Gate técnico. Portável (Amazon Q / Copilot / Kiro), **standalone**, sem subagente
+> e sem parser. Roda depois de `documentar-fluxo`.
 
-Você **audita um doc de fluxo** em três frentes: **completude estrutural** (bloqueante), **disciplina de citação** (bloqueante) e **rubrica de fluxo** (consultiva). Você não reescreve o doc — você emite um **veredito** com a lista exata do que consertar.
+Você audita um doc contra seu ledger **e contra o código citado**. Não reescreve o doc,
+não corrige código e não flexibiliza compromisso: grava um veredito persistente com a
+lista exata de correções.
 
-## Insumos
+## Contrato e saída
 
-- O doc: `docs/03-fluxos/<slug>.md`.
-- O grafo rastreado: `.arquitetura/mapa/fluxos/<slug>.grafo.md`.
+- Insumos: `docs/03-fluxos/<slug>.md`, `.arquitetura/grills/tecnico.<slug>.md`,
+  `.arquitetura/mapa/fluxos/<slug>.grafo.md`, `.arquitetura/contexto.md` e o código.
+- Saída obrigatória: `.arquitetura/gates/grill-doc.<slug>.md`.
+- Se algum insumo falta, IDs/slug divergem ou o código não corresponde ao snapshot sem
+  nova leitura, resultado `BLOQUEADO-PRECONDICAO`. Não audite por memória.
+- Quando aprovado, anexe o gate à associação `FLUXO-<slug> ↔ ENTRY-###` no mapa. Não
+  marque o entrypoint inteiro como aprovado: ele pode iniciar outros fluxos ainda crus.
 
-## Gate 1 · Completude estrutural — **BLOQUEANTE**
+## Gate 0 · Identidade, escopo e frescor — BLOQUEANTE
 
-A tese do gate: **toda aresta do grafo rastreado está na doc — coberta OU marcada `fora-de-escopo`.** Nenhum salto some no silêncio.
+- `FLUXO-<slug>`, `ENTRY-###`, doc e ledger referem o mesmo fluxo?
+- Grill, ledger e doc usam o mesmo snapshot?
+- O snapshot permite abrir exatamente o conteúdo citado? Commit só vale com árvore limpa.
+  Em árvore alterada/sem VCS, recalcule todos os fingerprints; ausência ou divergência
+  torna o artefato `stale` até novo trace.
+- Precondições, pós-condições, dentro/fora do escopo estão explícitos?
+- `DECISAO-PENDENTE-###` não foi tratada como decisão ratificada?
+- Cada `PERG-TEC-###` nomeia sinal concreto deste projeto, aponta gatilho, jurisdição,
+  impacto e critério de encerramento? Pergunta que apenas repete uma lente recebe
+  `PERGUNTA-GENERICA`; pergunta sem base recebe `PERGUNTA-SEM-GATILHO`.
+- Toda pergunta de jurisdição `código` está resolvida com evidência? Aberta recebe
+  `PERGUNTA-CODIGO-ABERTA`. Pendência humana só passa se estiver visível no doc.
 
-Para **cada** aresta do `<slug>.grafo.md`, classifique:
+Cada falha recebe `CONTRATO-INVALIDO` ou `STALE` e reprova.
 
-- **coberta** — o `arquivo:linha` do callee (ou uma linha da mesma unidade) aparece na prosa do doc, e o papel do salto está narrado.
-- **fora-de-escopo** — a aresta está marcada `fora-de-escopo` no grafo **e** listada como tal no doc, com motivo.
-- **AUSENTE** — nem uma coisa nem outra. **Cada AUSENTE reprova o gate.**
+## Gate 1 · Completude estrutural por ID — BLOQUEANTE
 
-Monte a **tabela de cobertura**:
+Classifique **todos** os IDs do ledger:
+
+- `PASSO-###`: aparece na prosa com mesmo significado e evidência.
+- `ARESTA-###`: está narrada/coberta ou explicitamente fora de escopo.
+- `BRANCH-###`: os dois resultados estão descritos, inclusive erro/retorno.
+- `FRONTEIRA-###`: dependência, direção, contrato e comportamento de falha aparecem.
+
+Sem representação → `AUSENTE`. ID citado com outro significado → `DRIFT-SEMANTICO`.
 
 ```md
-| # | Aresta (callee arquivo:linha) | Classe | Onde no doc |
-|---|---|---|---|
-| 1 | `<b:linha>` | coberta / fora-de-escopo / AUSENTE | <seção> |
+| ID | Tipo | Classe | Onde no doc | Observação |
+|---|---|---|---|---|
+| `PASSO-001` | passo | coberto/AUSENTE/DRIFT-SEMANTICO | <seção> | <motivo> |
 ```
 
-## Gate 2 · Disciplina de citação — **BLOQUEANTE**
+## Gate 2 · Evidência e jurisdição — BLOQUEANTE
 
-O princípio-norte: **a única fonte citável sobre o que o código faz é o código (`arquivo:linha`); o mapa e o humano nunca são citados como fato-de-código.** Varra o doc frase a frase:
+Varra a prosa frase a frase e **abra o código citado**:
 
-- Toda **frase de comportamento** ("valida", "grava", "recusa", "chama", "muda o estado para…") carrega um `arquivo:linha`? Sem citação → **SEM-CITAÇÃO** (reprova).
-- Alguma afirmação de comportamento está apoiada no **mapa** ou num **depoimento humano** como se fosse fato objetivo (em vez de `arquivo:linha`)? → **FONTE-ERRADA** (reprova). Depoimento humano só entra **atribuído**, para *porquê/restrição* — nunca para o que o código faz.
+- citação ausente → `SEM-CITACAO`;
+- arquivo/linha inexistente ou stale → `CITACAO-INVALIDA`;
+- linha existe, mas não sustenta verbo, condição ou resultado → `CITACAO-NAO-SUSTENTA`;
+- mapa/depoimento usado como fato de código → `FONTE-ERRADA`;
+- porquê/restrição humana sem atribuição → `SEM-ATRIBUICAO`.
 
-Liste cada violação com a frase e a seção.
+Presença de `arquivo:linha` não basta. O gate valida suporte semântico e usa o menor
+trecho necessário.
 
-## Gate 3 · Rubrica de fluxo — **CONSULTIVA**
+## Gate 3 · Visão sistêmica — BLOQUEANTE POR OMISSÃO
 
-O grafo garante que nenhum **salto rastreado** sumiu; a rubrica caça o **buraco semântico** que o grafo não enxerga (um error path que existe no código e nem virou aresta). Marque cada item `presente` / `ausente` / `N/A (motivo)`:
+Para cada `FRONTEIRA-###`, confirme que o doc declara:
 
-- [ ] **Gatilho** nomeado (quem/o quê dispara)
-- [ ] **Happy path** completo, passo a passo
-- [ ] **Cada error path** real coberto
-- [ ] **Cada chamada externa** nomeada, com o que acontece se falhar/demorar
-- [ ] **Transições de estado** (de→para, sob qual guarda)
-- [ ] **Idempotência** (chamar 2× causa efeito duplo? o que protege?)
-- [ ] **Timeout / retry** (prazo, re-tentativa, quem re-dispara)
-- [ ] **Compensação** (o que desfaz/estanca se um passo depois falha)
+- upstream/downstream e contrato;
+- falha/propagação, timeout/retry e recuperação;
+- ownership/observabilidade conhecidos **ou** `[PENDENTE]` explícito;
+- segurança/dados/compliance e `CON-###` aplicáveis **ou** `N/A` motivado.
 
-Consultivo = **não reprova**, mas todo `ausente` vira **recomendação** no veredito. (Um `ausente` aqui costuma indicar que o rastreamento parou raso — vale voltar ao `documentar-fluxo`.)
+Pendência honesta não reprova. Omissão silenciosa recebe `RISCO-OCULTO` e reprova.
+Confirme também que nenhum `ARC-###` foi contradito sem decisão pendente.
 
-## Veredito
+## Gate 4 · Rubrica arquitetural — CONSULTIVA
+
+Marque `presente`, `fraco`, `N/A (motivo)`:
+
+- contrato/escopo; happy path; branches/error paths; fronteiras;
+- estado/consistência; idempotência/concorrência; timeout/retry;
+- compensação/recuperação; observabilidade/ownership; segurança/compliance;
+- divergências/decisões pendentes.
+
+Todo `fraco` vira recomendação; não muda sozinho os gates bloqueantes.
+
+## Veredito persistente
+
+Grave:
 
 ```md
 # grill-doc — <slug>
-## Gate estrutural (bloqueante): PASSA / REPROVA
-<tabela de cobertura>  — AUSENTES: <n>
-## Gate de citação (bloqueante): PASSA / REPROVA
-<violações>  — SEM-CITAÇÃO: <n> · FONTE-ERRADA: <n>
-## Rubrica (consultiva)
-<checklist>  — recomendações: <lista>
-## Resultado: APROVADO  (só se os dois bloqueantes PASSAM)
-        ou   BLOQUEADO  → conserte: <lista exata>
+> Auditou snapshot <commit:hash|manifest:digest> em <data-hora>
+
+## Gate 0 · Contrato/frescor: PASSA / REPROVA
+PERGUNTA-GENERICA: <n> · PERGUNTA-SEM-GATILHO: <n> · PERGUNTA-CODIGO-ABERTA: <n>
+## Gate 1 · Completude por ID: PASSA / REPROVA
+<tabela completa> — AUSENTE: <n> · DRIFT-SEMANTICO: <n>
+## Gate 2 · Evidência/jurisdição: PASSA / REPROVA
+<violações com seção, frase, citação e correção esperada>
+## Gate 3 · Visão sistêmica: PASSA / REPROVA
+RISCO-OCULTO: <n> · pendências explícitas: <lista>
+## Gate 4 · Rubrica consultiva
+<checklist e recomendações>
+## Resultado: APROVADO / BLOQUEADO
+## Correções necessárias
+<lista exata ordenada por ID>
 ```
 
-## Critério de conclusão (checável)
+`APROVADO` exige Gates 0–3 passando. Um veredito anterior nunca substitui a auditoria
+do snapshot atual.
 
-- **Toda** aresta do grafo está classificada (coberta / fora-de-escopo / AUSENTE).
-- **Toda** frase de comportamento está classificada (citada / SEM-CITAÇÃO / FONTE-ERRADA).
-- Os **8** itens da rubrica estão marcados.
-- Veredito final emitido, coerente com os dois gates bloqueantes.
+## Critério de conclusão
+
+- Todo ID, toda `PERG-TEC-###` e toda frase comportamental foram classificados.
+- O grill não contém perguntas genéricas/sem gatilho nem pergunta de código aberta.
+- Todas as citações foram abertas e validadas semanticamente.
+- Todas as fronteiras foram auditadas; desconhecido está explícito, não oculto.
+- O arquivo de gate existe e o resultado é coerente.
+- A associação fluxo↔entrypoint recebeu o gate somente se aprovado.
 
 ## Handoff
 
-- **APROVADO** → imprima: *"grill-doc aprovado. Próximo passo: rode **`grill-mermaid`** no doc `docs/03-fluxos/<slug>.md`."*
-- **BLOQUEADO** → imprima: *"grill-doc bloqueado por <n> aresta(s) AUSENTE(s) / <n> citação(ões). Volte ao **`documentar-fluxo`** e cubra a lista acima."*
+- **APROVADO:** `grill-doc aprovado e gravado em .arquitetura/gates/grill-doc.<slug>.md. Próximo passo: rode grill-mermaid.`
+- **BLOQUEADO:** `grill-doc bloqueado. Volte ao documentar-fluxo e corrija a lista por ID; depois rode este gate novamente.`

@@ -1,7 +1,7 @@
 # `tools/empacotar.py` — empacotador canônico → 3 runtimes
 
 Transforma a **fonte canônica única** `prompts/*.md` nos 3 empacotamentos portáveis
-sob `dist/`, um por runtime-alvo. Repetível: quando os 9 geradores futuros da trilha
+sob `dist/`, um por runtime-alvo. Repetível: quando novos geradores da trilha
 entrarem em `prompts/`, são empacotados sem tocar neste código.
 
 ```bash
@@ -17,13 +17,18 @@ python3 tools/empacotar.py --verify   # paridade + frontmatter (não escreve nad
 Tirar o frontmatter de qualquer alvo devolve o canônico, caractere a caractere. Logo:
 **nunca edite nada em `dist/` à mão** — edite o canônico em `prompts/` e rode o gerador.
 O `--verify` regenera num tmp e compara byte-a-byte com `dist/`, então um alvo editado à
-mão (ou um `dist/` stale) reprova.
+mão (ou um `dist/` stale) reprova. Ele também valida o contrato arquitetural mínimo de
+cada canônico: título, marcador standalone, precondições/contrato, critério verificável,
+handoff, marcadores semânticos, persistência dos grills dinâmicos e saída persistente
+para todo gate. O step `revisar-arquitetura` também é validado por seus IDs de
+oportunidade/pergunta, deletion test, relatório temporário e forças de recomendação.
 
 ## Os 3 alvos (convenções confirmadas nos docs/fonte oficiais — 2026-07)
 
-Os 5 são **invocáveis (inclusão manual)**, não always-on: rodam em **sequência, um por
-vez** (cada prompt imprime o próximo comando; o mapa em `.arquitetura/` é o ledger).
-Always-on injetaria os 5 em toda interação — bloat de contexto e quebra da sequência.
+Os prompts da cadeia são **invocáveis (inclusão manual)**, não always-on: rodam em **sequência, um por
+vez** (cada prompt imprime o próximo comando; `.arquitetura/grills/` mantém perguntas,
+o mapa mantém o ledger e `.arquitetura/gates/` mantém aprovações persistentes).
+Always-on injetaria todos em toda interação — bloat de contexto e quebra da sequência.
 
 | Runtime | Arquivo gerado | Frontmatter | Invocação |
 |---|---|---|---|
@@ -49,9 +54,9 @@ Fontes: Amazon Q CLI v1.19.7 (`crates/chat-cli/src/util/paths.rs`) + IDE
 `context-prompt-library.html`; VS Code prompt-files docs + validador `promptValidator.ts`
 (`mode`→`agent`); Kiro `kiro.dev/docs/steering`.
 
-## Adicionar um prompt novo (a fatia dos 9 futuros)
+## Adicionar um prompt novo (a fatia dos geradores futuros)
 
-1. Escreva o canônico em `prompts/<nome>.md` (mesma forma dos 5: `# Prompt · \`<nome>\``
+1. Escreva o canônico em `prompts/<nome>.md` (mesma forma dos demais: `# Prompt · \`<nome>\``
    + corpo com princípio-norte embutido + handoff).
 2. `python3 tools/empacotar.py` — os 3 alvos aparecem em `dist/`.
 3. `python3 tools/empacotar.py --verify` — confirma paridade + frontmatter.
