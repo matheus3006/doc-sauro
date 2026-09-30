@@ -3,7 +3,7 @@
 empacotar.py — gerador de empacotamento portável dos prompts da trilha doc-sauro.
 
 FONTE CANÔNICA ÚNICA:
-    doc-sauro-btg/prompts/*.md   (exceto README.md — é a doc da cadeia, não um prompt)
+    doc-sauro/prompts/*.md   (exceto README.md — é a doc da cadeia, não um prompt)
 
 ALVOS (GERADOS — nunca editados à mão):
     dist/.amazonq/prompts/<nome>.md          Amazon Q  — prompt on-demand (Markdown puro)
@@ -35,8 +35,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-# --- localização (este script vive em doc-sauro-btg/tools/) ---
-ROOT = Path(__file__).resolve().parent.parent   # doc-sauro-btg/
+# --- localização (este script vive em doc-sauro/tools/) ---
+ROOT = Path(__file__).resolve().parent.parent   # doc-sauro/
 PROMPTS_DIR = ROOT / "prompts"
 DIST_DIR = ROOT / "dist"
 EXCLUDE = {"README.md"}                          # não é prompt

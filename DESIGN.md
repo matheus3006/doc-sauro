@@ -4,7 +4,7 @@
 > de qualquer codebase, de forma **completa** e **precisa**, rodando em **Amazon Q +
 > GitHub Copilot + Kiro** (sem Claude Code / sem subagentes).
 >
-> Referência de origem (a evoluir, não copiar): `matheus3006/arquitetura-amazonq-btg` (gerava HTML, raso).
+> Referência de origem (a evoluir, não copiar): `matheus3006/arquitetura-amazonq` (gerava HTML, raso).
 
 ---
 
@@ -66,7 +66,7 @@ Resolve tanto "o mapa não pode alucinar" quanto "o humano não pode mentir sobr
 
 ## 5. Conjunto de documentos (arquitetura de informação)
 
-Camada humana **elevada** a primeira classe (⭐ = novo/elevado vs. a referência BTG):
+Camada humana **elevada** a primeira classe (⭐ = novo/elevado vs. a referência arquitetura-amazonq):
 
 | Camada | Documentos |
 |---|---|
